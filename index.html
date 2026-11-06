@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blender course · Zedlab</title>
+<meta name="description" content="A course companion for six weeks of Blender 5.2 LTS. Your own course, saved on your own device.">
+<meta name="theme-color" content="#1D1D1B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Blender course">
+<link rel="icon" id="favicon" href="Zedlab_octopus_logo.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="app/styles.css">
+<script>
+  /* Light or dark, before anything is drawn (the choice is saved on this device). */
+  try { var saved = JSON.parse(localStorage.getItem("zedlabBlenderCourse.v1") || "null"); if (saved && saved.settings && saved.settings.theme === "light") document.documentElement.setAttribute("data-theme", "light"); } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to the lesson</a>
+
+<header class="topbar">
+  <a class="brand" href="#/today" aria-label="Zedlab Blender course: today">
+    <span class="logo" aria-hidden="true"></span>
+    <span class="brand-text" aria-hidden="true">Blender course</span>
+  </a>
+  <span class="topbar-name" id="learner-name"></span>
+</header>
+
+<nav class="tabs" id="tabs" aria-label="Main" hidden>
+  <a class="tab" href="#/today" data-tab="today">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+    <span>Today</span>
+  </a>
+  <a class="tab" href="#/calendar" data-tab="calendar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+    <span>Calendar</span>
+  </a>
+  <a class="tab" href="#/map" data-tab="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5.5" cy="18" r="2.2"/><circle cx="18.5" cy="6" r="2.2"/><path d="M7.6 17.2c4.6-1.4 1.4-6.6 5.6-8.3 1.6-.6 2.6-1.1 3.4-1.6"/></svg>
+    <span>Course map</span>
+  </a>
+  <a class="tab" href="#/toolbox" data-tab="toolbox">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2"/><path d="M9 8V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v2M3.5 13h17"/></svg>
+    <span>Toolbox</span>
+  </a>
+  <a class="tab tab--wide" href="#/progress" data-tab="progress">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 20v-6M12 20V9M19 20V4"/></svg>
+    <span>Progress</span>
+  </a>
+  <a class="tab tab--wide" href="#/work" data-tab="work">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-5-5-9 8.5"/></svg>
+    <span>My work</span>
+  </a>
+  <a class="tab tab--wide" href="#/certificate" data-tab="certificate">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5.5"/><path d="M8.8 14l-1.3 6.5L12 18l4.5 2.5-1.3-6.5"/></svg>
+    <span>Certificate</span>
+  </a>
+  <a class="tab tab--wide" href="#/settings" data-tab="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    <span>Settings</span>
+  </a>
+  <a class="tab tab--phone" href="#/more" data-tab="more">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>
+    <span>More</span>
+  </a>
+</nav>
+
+<main id="main" class="screen" tabindex="-1">
+  <noscript><p>This course app needs JavaScript switched on in your browser.</p></noscript>
+</main>
+
+<footer class="site-footer">Made by Zedlab. Not affiliated with the Blender Foundation.</footer>
+
+<div class="toast-zone" id="toasts" role="status" aria-live="polite"></div>
+<dialog class="dlg" id="dlg"></dialog>
+
+<script src="content/lessons.js"></script>
+<script src="content/glossary.js"></script>
+<script src="content/shortcuts.js"></script>
+<script src="content/standard.js"></script>
+<script src="content/visuals.js"></script>
+<script src="app/calendar.js"></script>
+<script src="app/store.js"></script>
+<script src="app/files.js"></script>
+<script src="app/visuals.js"></script>
+<script src="app/app.js"></script>
+</body>
+</html>

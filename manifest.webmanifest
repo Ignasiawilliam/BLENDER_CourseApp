@@ -1,0 +1,17 @@
+{
+  "name": "Zedlab Blender Course",
+  "short_name": "Blender course",
+  "description": "A course companion for six weeks of Blender 5.2 LTS. Your own course, saved on your own device.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1D1D1B",
+  "theme_color": "#1D1D1B",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

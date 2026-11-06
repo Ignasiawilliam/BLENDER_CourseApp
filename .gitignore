@@ -1,0 +1,15 @@
+# Files that must never be published (they hold personal details)
+BLENDER_AppBrief_v*.md
+BLENDER_Timetable_v*.md
+private-words.js
+
+# Blender files, backups and calendar files, if any end up in this folder
+*.blend
+*.blend1
+BLENDER_Backup_*.json
+*.ics
+
+# Files computers add on their own
+Thumbs.db
+desktop.ini
+.DS_Store

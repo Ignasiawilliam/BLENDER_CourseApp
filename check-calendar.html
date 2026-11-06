@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar check · Zedlab Blender Course</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --bg: #1d1d1d; --panel: #282828; --panel-2: #303030; --line: #3d3d3d;
+    --text: #e6e6e6; --muted: #a8a8a8; --accent: #f08a24; --ok: #6cc070; --bad: #ff6b6b; --off: #8a8a8a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header, main { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+  header { padding-top: 24px; }
+  main { padding-bottom: 60px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 19px; margin: 36px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 22px 0 8px; color: var(--accent); }
+  p.lead { color: var(--muted); margin: 0 0 12px; max-width: 75ch; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  nav a { color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; text-decoration: none; font-size: 14px; }
+  nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+  .summary { font-size: 17px; font-weight: 600; margin: 12px 0; }
+  .summary.ok { color: var(--ok); } .summary.bad { color: var(--bad); }
+  ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  ul.checks li { background: var(--panel); border-radius: 10px; padding: 10px 14px; display: grid;
+    grid-template-columns: 28px 1fr; gap: 6px; align-items: start; }
+  .mark { font-weight: 700; font-size: 18px; line-height: 1.3; }
+  .mark.ok { color: var(--ok); } .mark.bad { color: var(--bad); }
+  .detail { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .detail.bad { color: var(--bad); }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  th { background: var(--panel-2); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.date { white-space: nowrap; }
+  td.moved { color: var(--accent); white-space: nowrap; font-weight: 600; }
+  td.yes { color: var(--ok); font-weight: 700; } td.no { color: var(--bad); font-weight: 700; }
+  .log { background: var(--panel); border-radius: 10px; padding: 12px 16px; margin: 6px 0; }
+  .log .kind { color: var(--ok); margin-top: 6px; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent);
+    color: var(--accent); white-space: nowrap; margin-left: 6px; }
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Calendar check <span>·</span> Zedlab Blender Course</h1>
+  <p class="lead">Every lesson date is worked out, never typed in. This page runs the automatic tests on the date calculator and shows the dates it works out.</p>
+  <nav aria-label="Sections">
+    <a href="#checks">Tests</a><a href="#b">With 3 and 4 Nov missed</a><a href="#log">Changes log</a>
+    <a href="#a">Nothing missed</a><a href="#c">Changes</a>
+  </nav>
+</header>
+<main id="app"><p>Running the tests…</p></main>
+<footer>Made by Zedlab. Not affiliated with the Blender Foundation.</footer>
+
+<script src="content/lessons.js"></script>
+<script src="app/calendar.js"></script>
+<script src="app/files.js"></script>
+
+<script id="calendar-tests">
+/* The tests. They use no screen, so they can also run on their own. */
+window.runCalendarTests = function (C, Cal) {
+  "use strict";
+  var tests = [], tables = {};
+  function test(group, name, ok, details) { tests.push({ group: group, name: name, ok: !!ok, details: details || [] }); }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function dates(s) { return s.lessons.map(function (l) { return l.date; }); }
+  function listDiff(got, want) {
+    var out = [];
+    for (var i = 0; i < Math.max(got.length, want.length); i++) {
+      if (got[i] !== want[i]) out.push("Lesson " + (i + 1) + ": worked out " + (got[i] ? Cal.formatLong(got[i]) : "nothing") +
+        ", expected " + (want[i] ? Cal.formatLong(want[i]) : "nothing") + ".");
+    }
+    return out;
+  }
+  function plusYear(list) { return list.map(function (d) { return d.length === 5 ? (d < "06-00" ? "2027-" : "2026-") + d : d; }); }
+  var MON_FRI = [1, 2, 3, 4, 5];
+  var DAYS_OFF = C.course.defaultDaysOff;
+
+  /* The 29 dates in BLENDER_Timetable_v3 (start Monday 2 November 2026, 3 and 4 November missed). */
+  var TIMETABLE = plusYear(["11-02", "11-05", "11-06", "11-09", "11-10", "11-11", "11-12", "11-13", "11-16", "11-17",
+    "11-18", "11-19", "11-20", "11-23", "11-24", "11-25", "11-26", "11-27", "11-30", "12-01",
+    "12-02", "12-03", "12-04", "12-07", "12-08", "12-10", "12-11", "12-14", "12-15"]);
+  /* Worked out by hand: the same course with nothing missed. */
+  var NOTHING_MISSED = plusYear(["11-02", "11-03", "11-04", "11-05", "11-06", "11-09", "11-10", "11-11", "11-12", "11-13",
+    "11-16", "11-17", "11-18", "11-19", "11-20", "11-23", "11-24", "11-25", "11-26", "11-27",
+    "11-30", "12-01", "12-02", "12-03", "12-04", "12-07", "12-08", "12-10", "12-11"]);
+  /* Worked out by hand: from Monday 16 November, lessons on Monday, Wednesday and Friday only. */
+  var MON_WED_FRI = plusYear(["11-02", "11-05", "11-06", "11-09", "11-10", "11-11", "11-12", "11-13", "11-16", "11-18",
+    "11-20", "11-23", "11-25", "11-27", "11-30", "12-02", "12-04", "12-07", "12-11", "12-14",
+    "12-16", "12-18", "12-21", "12-23", "12-25", "12-28", "12-30", "01-01", "01-04"]);
+
+  /* ---------- a. Nothing missed ---------- */
+  var planA = Cal.newPlan({ startDate: "2026-11-02", lessonDays: MON_FRI, daysOff: DAYS_OFF, lessonCount: 29 });
+  var sA = Cal.schedule(planA);
+  test("a", "Start Monday 2 November 2026, Monday to Friday, day off 9 December, nothing missed: certificate day is Friday 11 December 2026",
+    sA.finishDate === "2026-12-11", ["Worked out: " + (sA.finishDate ? Cal.formatLong(sA.finishDate) : sA.problem)]);
+  test("a", "Every date in that course matches the dates worked out by hand", same(dates(sA), NOTHING_MISSED), listDiff(dates(sA), NOTHING_MISSED));
+  tables.a = sA;
+
+  /* ---------- b. 3 and 4 November missed ---------- */
+  var planB = Cal.newPlan({ startDate: "2026-11-02", lessonDays: MON_FRI, daysOff: DAYS_OFF, lessonCount: 29 });
+  planB.missed = ["2026-11-03", "2026-11-04"];
+  var sB = Cal.schedule(planB);
+  function lessonAt(n) { return Cal.dateOf(sB, n); }
+  test("b", "Same course with 3 and 4 November missed: Week 1, day 2 is on Thursday 5 November",
+    lessonAt(2) === "2026-11-05", ["Worked out: " + Cal.formatLong(lessonAt(2))]);
+  test("b", "The week 1 project is on Tuesday 10 November", lessonAt(5) === "2026-11-10", ["Worked out: " + Cal.formatLong(lessonAt(5))]);
+  test("b", "The .glb lesson (Week 6, day 1) is on Thursday 10 December", lessonAt(26) === "2026-12-10", ["Worked out: " + Cal.formatLong(lessonAt(26))]);
+  test("b", "Certificate day is Tuesday 15 December 2026", sB.finishDate === "2026-12-15", ["Worked out: " + Cal.formatLong(sB.finishDate)]);
+  test("b", "All 29 dates match BLENDER_Timetable_v3 exactly", same(dates(sB), TIMETABLE), listDiff(dates(sB), TIMETABLE));
+  tables.b = sB;
+
+  /* Pressing "Can't today" on 3 November, then on 4 November, as it happened. */
+  var step1 = Cal.markMissed(planA, "2026-11-03", "2026-11-03", C.weeks);
+  var step2 = Cal.markMissed(step1.plan, "2026-11-04", "2026-11-04", C.weeks);
+  var sSteps = Cal.schedule(step2.plan);
+  test("b", "Pressing “Can't today” on 3 November, then on 4 November, gives exactly the same dates",
+    same(dates(sSteps), TIMETABLE), listDiff(dates(sSteps), TIMETABLE));
+  test("b", "Each press moves Week 1, day 2 by one lesson day and every later lesson with it, as in the timetable's changes log",
+    step1.change && step1.change.from === "2026-11-03" && step1.change.to === "2026-11-04" &&
+    step2.change && step2.change.from === "2026-11-04" && step2.change.to === "2026-11-05",
+    [step1.change ? step1.change.text : "No change recorded.", step2.change ? step2.change.text : "No change recorded."]);
+  test("b", "The finish date moves Friday 11 December → Monday 14 December → Tuesday 15 December, as in the timetable's changes log",
+    step1.change.finishBefore === "2026-12-11" && step1.change.finishAfter === "2026-12-14" &&
+    step2.change.finishBefore === "2026-12-14" && step2.change.finishAfter === "2026-12-15");
+  test("b", "The changes log has one dated line for each press, and each press gives a kind message with the new finish date",
+    step2.plan.changes.length === 2 && /^Tuesday 3 November 2026: /.test(step2.plan.changes[0].text) &&
+    /^Wednesday 4 November 2026: /.test(step2.plan.changes[1].text) &&
+    /finishes on Tuesday 15 December 2026\.$/.test(step2.change.kindMessage) && !/sorry|late|fail|should/i.test(step2.change.kindMessage),
+    [step2.change.kindMessage]);
+  tables.log = step2.plan.changes;
+
+  test("b", "On a missed day the calendar shows it as missed, with no lesson on it",
+    (function () { var i = Cal.dayInfo(planB, sB, "2026-11-03"); return i.missed && i.lesson === null; })());
+  test("b", "On 9 December the calendar shows Independence Day, with no lesson on it",
+    (function () { var i = Cal.dayInfo(planB, sB, "2026-12-09"); return i.dayOff === "Independence Day" && i.lesson === null; })());
+  test("b", "On a missed day, Today shows the next lesson: Week 1, day 2 on Thursday 5 November",
+    (function () { var n = Cal.nextLessonFrom(sB, "2026-11-03"); return n && n.number === 2 && n.date === "2026-11-05"; })());
+
+  /* ---------- c. Changes move every later lesson correctly ---------- */
+  var cDays = Cal.setLessonDays(planB, [1, 3, 5], "2026-11-16", "2026-11-14", C.weeks);
+  var sC1 = Cal.schedule(cDays.plan);
+  test("c", "Changing lesson days to Monday, Wednesday and Friday from Monday 16 November: lessons before that keep their dates, every later lesson moves to the new days",
+    same(dates(sC1), MON_WED_FRI), listDiff(dates(sC1), MON_WED_FRI).concat([cDays.change.text]));
+  test("c", "…and the certificate day becomes Monday 4 January 2027", sC1.finishDate === "2027-01-04", ["Worked out: " + Cal.formatLong(sC1.finishDate)]);
+
+  var cOff = Cal.addDayOff(planB, { date: "2026-11-20", name: "" }, "2026-11-14", C.weeks);
+  var sC2 = Cal.schedule(cOff.plan);
+  var wantC2 = TIMETABLE.slice(0, 12).concat(TIMETABLE.slice(13), ["2026-12-16"]);
+  test("c", "Adding a day off on Friday 20 November: lessons 1 to 12 keep their dates, lessons 13 to 29 each move one lesson day",
+    same(dates(sC2), wantC2), listDiff(dates(sC2), wantC2).concat([cOff.change.text]));
+  test("c", "…and the certificate day becomes Wednesday 16 December 2026", sC2.finishDate === "2026-12-16");
+  tables.c = { base: sB, days: sC1, off: sC2, daysText: cDays.change.text, offText: cOff.change.text };
+
+  [["Saturday 21 November (a weekend)", "2026-11-21"], ["Sunday 1 November (before the start)", "2026-11-01"],
+   ["Friday 25 December (after the course ends)", "2026-12-25"]].forEach(function (c) {
+    var r = Cal.addDayOff(planB, { date: c[1], name: "" }, "2026-11-01", C.weeks);
+    test("c", "A day off on " + c[0] + " moves nothing", same(dates(Cal.schedule(r.plan)), TIMETABLE) && /No lesson moves/.test(r.change.text), [r.change.text]);
+  });
+
+  (function () {
+    var r = Cal.markMissed(planB, "2026-11-07", "2026-11-07", C.weeks);
+    test("c", "“Can't today” on a Saturday, when there is no lesson, moves nothing and writes nothing in the log",
+      r.change === null && same(dates(Cal.schedule(r.plan)), TIMETABLE));
+    var once = Cal.markMissed(planA, "2026-11-03", "2026-11-03", C.weeks);
+    var twice = Cal.markMissed(once.plan, "2026-11-03", "2026-11-03", C.weeks);
+    test("c", "Marking the same day twice counts once",
+      twice.change === null && twice.plan.changes.length === 1 && same(dates(Cal.schedule(twice.plan)), dates(Cal.schedule(once.plan))));
+  })();
+
+  (function () {
+    var p = Cal.newPlan({ startDate: "2026-10-31", lessonDays: MON_FRI, daysOff: DAYS_OFF });
+    var first = Cal.schedule(p).lessons[0].date;
+    test("c", "A start date on a Saturday (31 October 2026): lesson 1 is on Monday 2 November", first === "2026-11-02", ["Worked out: " + Cal.formatLong(first)]);
+    var q = Cal.newPlan({ startDate: "2026-12-09", lessonDays: MON_FRI, daysOff: DAYS_OFF });
+    var firstQ = Cal.schedule(q).lessons[0].date;
+    test("c", "A start date on a day off (9 December 2026): lesson 1 is on Thursday 10 December", firstQ === "2026-12-10", ["Worked out: " + Cal.formatLong(firstQ)]);
+    var r = Cal.newPlan({ startDate: "2027-11-01", lessonDays: MON_FRI, daysOff: DAYS_OFF });
+    var sR = Cal.schedule(r), info = Cal.dayInfo(r, sR, "2027-12-09");
+    test("c", "9 December is a day off every year: in a course in 2027, Thursday 9 December 2027 has no lesson",
+      info.dayOff === "Independence Day" && info.lesson === null);
+    var none = Cal.setLessonDays(planA, [], "2026-11-02", "2026-11-01", C.weeks);
+    var sNone = Cal.schedule(none.plan);
+    test("c", "With no lesson days chosen, the app says so in plain words instead of freezing",
+      sNone.finishDate === null && /Choose at least one lesson day/.test(sNone.problem), [sNone.problem]);
+  })();
+
+  /* ---------- Taking a day off away again, moving the start date ---------- */
+  (function () {
+    const idx = planB.daysOff.findIndex((d) => d.month === 12 && d.day === 9);
+    const r = Cal.removeDayOff(planB, idx, "2026-11-20", C.weeks), s = Cal.schedule(r.plan);
+    const want = TIMETABLE.slice(0, 25).concat(["2026-12-09", "2026-12-10", "2026-12-11", "2026-12-14"]);
+    test("c", "Taking away the 9 December day off: lessons up to the week 5 project keep their dates, the .glb lesson moves back to Wednesday 9 December, and the course finishes on Monday 14 December",
+      same(dates(s), want), listDiff(dates(s), want).concat([r.change ? r.change.text : "No change recorded."]));
+    const st = Cal.setStartDate(planA, "2026-11-09", "2026-11-05", C.weeks), s2 = Cal.schedule(st.plan);
+    test("c", "Moving the start date to Monday 9 November before the course begins: lesson 1 is on 9 November and the course finishes on Friday 18 December",
+      s2.lessons[0].date === "2026-11-09" && s2.finishDate === "2026-12-18", [st.change ? st.change.text : "No change recorded."]);
+  })();
+
+  /* ---------- The backup and the phone calendar file ---------- */
+  (function () {
+    const F = window.CourseFiles;
+    if (!F) { test("files", "The backup and phone calendar helpers are loaded", false); return; }
+    const ics = F.makeIcs(Cal, planB, C, { lessonTime: "16:00", lessonMinutes: 45 }, new Date(Date.UTC(2026, 10, 5, 12, 0, 0)), "2026-11-05T11:00:00.000Z");
+    const flat = ics.replace(/\r\n /g, "");
+    const starts = (flat.match(/^DTSTART:\d{8}T\d{6}$/gm) || []).map((l) => l.slice(8));
+    const wantStarts = TIMETABLE.map((d) => d.replace(/-/g, "") + "T160000");
+    test("files", "The phone calendar file has one event per lesson: 29 events on exactly the dates in BLENDER_Timetable_v3, at 16:00",
+      (flat.split("BEGIN:VEVENT").length - 1) === 29 && same(starts, wantStarts), ["Events: " + (flat.split("BEGIN:VEVENT").length - 1)]);
+    test("files", "Every event has an alert 15 minutes before, and lasts the lesson's 45 minutes (16:00 to 16:45)",
+      (flat.match(/TRIGGER:-PT15M/g) || []).length === 29 && (flat.match(/^DTEND:\d{8}T164500$/gm) || []).length === 29);
+    test("files", "Times follow the device's own time zone: no fixed zone is written into the file",
+      !/^DTSTART:[^\r\n]*Z$/m.test(flat) && !/TZID/.test(flat));
+    test("files", "Lesson titles with commas are written the way calendar apps read them",
+      flat.indexOf("SUMMARY:Blender: Week 1\\, day 3\\, Select\\, move\\, rotate\\, scale") >= 0);
+    test("files", "The file is laid out as calendar apps expect: every line ends with a line break and is at most 75 bytes",
+      ics.split("\r\n").every((l) => new TextEncoder().encode(l).length <= 75) && !/[^\r]\n/.test(ics) && /^BEGIN:VCALENDAR\r\n/.test(ics) && /END:VCALENDAR\r\n$/.test(ics));
+    const late = F.makeIcs(Cal, planA, C, { lessonTime: "23:30", lessonMinutes: 45 }, new Date(Date.UTC(2026, 10, 5)), "x").replace(/\r\n /g, "");
+    test("files", "A lesson at 23:30 that runs past midnight ends at 00:15 the next day",
+      /DTSTART:20261102T233000\r\nDTEND:20261103T001500/.test(late));
+
+    const state = { version: 1, createdAt: "2026-11-02T08:00:00.000Z", learner: { name: "Test Learner" },
+      settings: { lessonTime: "16:00", lessonMinutes: 45, hasBlender: "yes", theme: "dark" }, plan: step2.plan,
+      done: { 1: { on: "2026-11-02", hard: "Finding the Timeline", repeat: true } }, dayZero: [true, true, false, true],
+      standard: [true, false, false, false, false, false, false, false, false], reviewer: "", timer: { lesson: 2, startedAt: 1, pausedAt: null, pausedTotal: 0 } };
+    const pics = [{ id: "a1", lesson: 2, addedOn: "2026-11-05", w: 2, h: 1, data: "data:image/png;base64,iVBORw0KGgo=" }];
+    const back = F.parseBackup(F.makeBackup(state, pics, "2026-11-06T10:00:00.000Z"));
+    test("files", "A backup read back gives exactly the same course: name, dates, changes log, ticks, notes and pictures",
+      back.ok && same(back.state, Object.assign({}, state, { timer: null })) && same(back.pictures, pics), back.ok ? [] : [back.reason]);
+    test("files", "The backup file is named BLENDER_Backup_ followed by the date",
+      F.backupFileName("2026-11-06") === "BLENDER_Backup_2026-11-06.json");
+    const bad = [F.parseBackup("hello"), F.parseBackup(JSON.stringify({ app: "Another app" })),
+      F.parseBackup(JSON.stringify({ app: "Zedlab Blender Course", kind: "backup", format: 1, state: { learner: { name: "x" }, plan: { startDate: "2026-02-30", lessonDayPlan: [] } } }))];
+    test("files", "A file that isn't a good backup is refused, with a plain message",
+      bad.every((b) => !b.ok && b.reason), bad.map((b) => b.reason));
+  })();
+
+  /* ---------- A lesson day that passed without a tick ---------- */
+  (function () {
+    var r = Cal.catchUp(planB, 3, "2026-11-10", C.weeks), s = Cal.schedule(r.plan);
+    var want = TIMETABLE.slice(0, 2).concat(TIMETABLE.slice(4), ["2026-12-16", "2026-12-17"]);
+    test("catch", "Week 1, day 3 (Friday 6 November) not ticked, and it is now Tuesday 10 November: it moves to today, lessons 1 and 2 keep their dates, every later lesson moves along",
+      Cal.dateOf(s, 3) === "2026-11-10" && same(dates(s), want), listDiff(dates(s), want).concat([r.change ? r.change.text : "No change recorded."]));
+    test("catch", "…the finish date moves two lesson days, to Thursday 17 December, with one dated line in the changes log and a kind message",
+      s.finishDate === "2026-12-17" && r.plan.changes.length === 1 && r.change.kind === "catch up" &&
+      / is now today, /.test(r.change.kindMessage), [r.change.kindMessage]);
+    var w = Cal.catchUp(planB, 3, "2026-11-07", C.weeks), sw = Cal.schedule(w.plan);
+    test("catch", "The same lesson caught up on a Saturday lands on Monday 9 November, the next lesson day",
+      Cal.dateOf(sw, 3) === "2026-11-09", ["Worked out: " + Cal.formatLong(Cal.dateOf(sw, 3))]);
+    var n = Cal.catchUp(planB, 3, "2026-11-06", C.weeks);
+    test("catch", "A lesson whose day is today, or still to come, is never moved by this", n.change === null && same(dates(Cal.schedule(n.plan)), TIMETABLE));
+  })();
+
+  /* ---------- Weeks follow the lessons ---------- */
+  (function () {
+    var bad = [];
+    var want = { 1: [1, 1], 5: [1, 5], 6: [2, 1], 10: [2, 5], 11: [3, 1], 16: [4, 1], 21: [5, 1], 25: [5, 5], 26: [6, 1], 29: [6, 4] };
+    Object.keys(want).forEach(function (n) {
+      var w = Cal.weekOf(+n, C.weeks);
+      if (!w || w.week !== want[n][0] || w.day !== want[n][1]) bad.push("Lesson " + n + " gave " + JSON.stringify(w));
+    });
+    for (var n = 1; n <= 29; n++) if (!Cal.weekOf(n, C.weeks)) bad.push("Lesson " + n + " is in no week.");
+    test("weeks", "Week numbers follow the lessons, not the calendar: lessons 1–5 are week 1 … lessons 26–29 are week 6, even when a week runs over a weekend or a day off", !bad.length, bad);
+    test("weeks", "Before you start (Day 0) is a step before lesson 1, not a numbered lesson: the calendar holds lessons 1 to 29",
+      sB.lessons.length === 29 && sB.lessons[0].number === 1 && sB.lessons[28].number === 29);
+  })();
+
+  /* ---------- 500 made-up courses: nothing squeezed, nothing skipped ---------- */
+  (function () {
+    var seed = 20261105;
+    function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    function pick(n) { return Math.floor(rnd() * n); }
+    var problems = [], courses = 500;
+    for (var k = 0; k < courses && problems.length < 5; k++) {
+      var start = Cal.addDays("2026-01-01", pick(1100));
+      var days = []; for (var d = 0; d < 7; d++) if (rnd() < 0.5) days.push(d);
+      if (!days.length) days.push(pick(7));
+      var offs = DAYS_OFF.slice(); for (var o = pick(6); o > 0; o--) offs.push({ date: Cal.addDays(start, pick(240)), name: "" });
+      var plan = Cal.newPlan({ startDate: start, lessonDays: days, daysOff: offs });
+      var label = "Course " + (k + 1) + " (start " + start + ", days " + days.join("") + ")";
+      for (var step = pick(8); step > 0; step--) {
+        var before = Cal.schedule(plan), choice = rnd(), res, cut;
+        if (choice < 0.5) {
+          var l = before.lessons[pick(29)]; cut = l.date; res = Cal.markMissed(plan, cut, cut);
+        } else if (choice < 0.8) {
+          cut = Cal.addDays(start, pick(300)); res = Cal.addDayOff(plan, { date: cut, name: "" }, start);
+        } else {
+          var nd = []; for (var e = 0; e < 7; e++) if (rnd() < 0.5) nd.push(e);
+          if (!nd.length) nd.push(pick(7));
+          cut = Cal.addDays(start, pick(200)); res = Cal.setLessonDays(plan, nd, cut, start);
+        }
+        plan = res.plan;
+        var after = Cal.schedule(plan);
+        before.lessons.forEach(function (x, i) {
+          var y = after.lessons[i];
+          if (x.date < cut && y.date !== x.date) problems.push(label + ": lesson " + x.number + " before the change moved.");
+          /* A missed day or a new day off can only push lessons later. New lesson days may bring them earlier. */
+          if (choice < 0.8 && y.date < x.date) problems.push(label + ": lesson " + x.number + " moved earlier.");
+        });
+      }
+      var s = Cal.schedule(plan);
+      if (s.lessons.length !== 29) { problems.push(label + ": " + s.lessons.length + " lessons."); continue; }
+      var used = {};
+      s.lessons.forEach(function (x, i) {
+        if (x.number !== i + 1) problems.push(label + ": lesson numbers out of order.");
+        if (i && x.date <= s.lessons[i - 1].date) problems.push(label + ": two lessons squeezed onto one day, or out of order.");
+        if (!Cal.isLessonWeekday(plan, x.date)) problems.push(label + ": lesson " + x.number + " on a day that is not a lesson day.");
+        if (Cal.dayOffOn(plan, x.date)) problems.push(label + ": lesson " + x.number + " on a day off.");
+        if (Cal.isMissed(plan, x.date)) problems.push(label + ": lesson " + x.number + " on a missed day.");
+        used[x.date] = true;
+      });
+      for (var day = s.lessons[0].date; day <= s.finishDate; day = Cal.addDays(day, 1)) {
+        if (Cal.isLessonWeekday(plan, day) && !Cal.dayOffOn(plan, day) && !Cal.isMissed(plan, day) && !used[day])
+          problems.push(label + ": free lesson day " + day + " left empty.");
+      }
+    }
+    test("random", courses + " made-up courses, with random start dates, lesson days, days off, “Can't today” presses and lesson-day changes: every lesson on its own lesson day, in order, never on a day off or a missed day, no free lesson day left empty, and a change never moves an earlier lesson",
+      problems.length === 0, problems.slice(0, 5));
+  })();
+
+  /* ---------- Dates never slip ---------- */
+  (function () {
+    var bad = [], day = "2026-01-01", count = 0;
+    while (day <= "2030-12-31" && bad.length < 5) {
+      var next = Cal.addDays(day, 1);
+      var p = day.split("-");
+      var local = new Date(+p[0], +p[1] - 1, +p[2] + 1, 12, 0, 0);
+      if (Cal.todayKey(local) !== next) bad.push(day + " → " + next + " but this device's calendar says " + Cal.todayKey(local));
+      if (Cal.weekday(next) !== (Cal.weekday(day) + 1) % 7) bad.push("Weekday did not step by one after " + day);
+      if (Cal.weekday(day) !== new Date(+p[0], +p[1] - 1, +p[2], 12).getDay()) bad.push("Weekday of " + day + " differs from this device's calendar");
+      day = next; count++;
+    }
+    test("dates", "Every day from 1 January 2026 to 31 December 2030 (" + count + " days) follows this device's calendar, with the right weekday, including the days the clocks change", !bad.length, bad);
+    var late = Cal.todayKey(new Date(2026, 10, 4, 23, 59)), early = Cal.todayKey(new Date(2026, 10, 5, 0, 1));
+    test("dates", "Just before and just after midnight, “today” is the right day (23:59 on 4 November is still 4 November)",
+      late === "2026-11-04" && early === "2026-11-05", ["23:59 → " + late, "00:01 → " + early]);
+    test("dates", "Impossible dates such as 30 February are refused", !Cal.isKey("2026-02-30") && Cal.isKey("2028-02-29") && !Cal.isKey("2026-13-01"));
+  })();
+
+  return { tests: tests, tables: tables };
+};
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var C = window.COURSE_CONTENT, Cal = window.CourseCalendar, app = document.getElementById("app");
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  var r;
+  try { r = window.runCalendarTests(C, Cal); }
+  catch (e) { app.innerHTML = '<p class="summary bad">The tests could not run: ' + esc(e.message) + "</p>"; return; }
+  var tests = r.tests, t = r.tables, h = [];
+  var bad = tests.filter(function (x) { return !x.ok; }).length;
+  var groups = { a: "a. Nothing missed", b: "b. 3 and 4 November missed", c: "c. Changing lesson days, adding days off, edge cases",
+    "catch": "A lesson day that passed without a tick", files: "The backup and the phone calendar file", weeks: "Weeks follow the lessons", random: "Nothing squeezed, nothing skipped", dates: "Dates never slip" };
+  function lessonTitle(n) { var l = C.lessons[n - 1]; return l ? l.title : ""; }
+  function label(n) { return Cal.lessonLabel(n, C.weeks); }
+
+  h.push('<section id="checks" aria-labelledby="h-t"><h2 id="h-t">Automatic tests</h2>');
+  h.push('<p class="summary ' + (bad ? "bad" : "ok") + '" role="status">' +
+    (bad ? bad + " of " + tests.length + " tests need fixing." : "All " + tests.length + " tests pass.") + "</p>");
+  Object.keys(groups).forEach(function (g) {
+    var list = tests.filter(function (x) { return x.group === g; });
+    if (!list.length) return;
+    h.push("<h3>" + esc(groups[g]) + '</h3><ul class="checks">');
+    list.forEach(function (x) {
+      var showDetails = !x.ok || (x.details.length && x.details.length <= 2);
+      h.push('<li><span class="mark ' + (x.ok ? "ok" : "bad") + '" aria-label="' + (x.ok ? "Passes" : "Fails") + '">' +
+        (x.ok ? "✓" : "✗") + "</span><div>" + esc(x.name) +
+        (showDetails ? x.details.map(function (d) { return '<div class="detail' + (x.ok ? "" : " bad") + '">' + esc(d) + "</div>"; }).join("") : "") +
+        "</div></li>");
+    });
+    h.push("</ul>");
+  });
+  h.push("</section>");
+
+  /* The real course: 3 and 4 November missed. */
+  var TIMETABLE_ROWS = t.b.lessons;
+  h.push('<section id="b" aria-labelledby="h-b"><h2 id="h-b">Start 2 November 2026, with 3 and 4 November missed</h2>' +
+    '<p class="lead">The dates the calculator works out, next to the dates in BLENDER_Timetable_v3.</p><div class="scroll"><table>' +
+    "<thead><tr><th>Lesson</th><th>Week, day</th><th>Title</th><th>Worked out</th><th>Timetable</th><th>Same?</th></tr></thead><tbody>");
+  var TT = ["11-02", "11-05", "11-06", "11-09", "11-10", "11-11", "11-12", "11-13", "11-16", "11-17", "11-18", "11-19", "11-20",
+    "11-23", "11-24", "11-25", "11-26", "11-27", "11-30", "12-01", "12-02", "12-03", "12-04", "12-07", "12-08", "12-10", "12-11",
+    "12-14", "12-15"].map(function (d) { return "2026-" + d; });
+  TIMETABLE_ROWS.forEach(function (l, i) {
+    var ok = l.date === TT[i];
+    var star = C.lessons[i].kind !== "lesson" ? '<span class="tag">' + esc(C.lessons[i].kind) + "</span>" : "";
+    h.push('<tr><td class="num">' + l.number + "</td><td>" + esc(label(l.number)) + "</td><td>" + esc(lessonTitle(l.number)) + star +
+      '</td><td class="date">' + esc(Cal.formatLong(l.date)) + '</td><td class="date">' + esc(Cal.formatLong(TT[i])) +
+      '</td><td class="' + (ok ? "yes" : "no") + '">' + (ok ? "✓" : "✗") + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  h.push("<section id=\"log\" aria-labelledby=\"h-log\"><h2 id=\"h-log\">The changes log after pressing “Can't today” on 3 and 4 November</h2>" +
+    '<p class="lead">Each press adds a dated line. The learner sees the kind message once, with the new finish date.</p>');
+  t.log.forEach(function (c) {
+    h.push('<div class="log">' + esc(c.text) + '<div class="kind">' + esc(c.kindMessage) + "</div></div>");
+  });
+  h.push("</section>");
+
+  h.push('<section id="a" aria-labelledby="h-a"><h2 id="h-a">Start 2 November 2026, nothing missed</h2><div class="scroll"><table>' +
+    "<thead><tr><th>Lesson</th><th>Week, day</th><th>Title</th><th>Date</th></tr></thead><tbody>");
+  t.a.lessons.forEach(function (l) {
+    h.push('<tr><td class="num">' + l.number + "</td><td>" + esc(label(l.number)) + "</td><td>" + esc(lessonTitle(l.number)) +
+      '</td><td class="date">' + esc(Cal.formatLong(l.date)) + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  h.push('<section id="c" aria-labelledby="h-c"><h2 id="h-c">Two changes, side by side</h2>' +
+    '<p class="lead">Starting from the real course (3 and 4 November missed). Dates that move are in orange.</p>' +
+    '<div class="log">' + esc(t.c.daysText) + "</div>" + '<div class="log">' + esc(t.c.offText) + "</div>" +
+    '<div class="scroll"><table><thead><tr><th>Lesson</th><th>Week, day</th><th>As planned</th><th>Lessons on Mon, Wed, Fri from 16 Nov</th><th>Day off on Fri 20 Nov</th></tr></thead><tbody>');
+  t.c.base.lessons.forEach(function (l, i) {
+    var d1 = t.c.days.lessons[i].date, d2 = t.c.off.lessons[i].date;
+    h.push('<tr><td class="num">' + l.number + "</td><td>" + esc(label(l.number)) + '</td><td class="date">' + esc(Cal.formatShort(l.date)) +
+      " " + l.date.slice(0, 4) + '</td><td class="' + (d1 !== l.date ? "moved" : "date") + '">' + esc(Cal.formatShort(d1)) + " " + d1.slice(0, 4) +
+      '</td><td class="' + (d2 !== l.date ? "moved" : "date") + '">' + esc(Cal.formatShort(d2)) + " " + d2.slice(0, 4) + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  app.innerHTML = h.join("");
+  document.title = (bad ? "✗ " : "✓ ") + document.title;
+})();
+</script>
+</body>
+</html>

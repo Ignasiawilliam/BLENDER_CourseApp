@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Content check · Zedlab Blender Course</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --bg: #1d1d1d; --panel: #282828; --panel-2: #303030; --line: #3d3d3d;
+    --text: #e6e6e6; --muted: #a8a8a8; --accent: #f08a24; --ok: #6cc070; --bad: #ff6b6b; --warn: #e8c547;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 24px 20px 8px; max-width: 1200px; margin: 0 auto; }
+  main { padding: 0 20px 60px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 19px; margin: 36px 0 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  p.lead { color: var(--muted); margin: 0 0 12px; max-width: 70ch; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  nav a { color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; text-decoration: none; font-size: 14px; }
+  nav a:hover, nav a:focus-visible { border-color: var(--accent); outline: none; }
+  .summary { font-size: 17px; font-weight: 600; margin: 12px 0; }
+  .summary.ok { color: var(--ok); } .summary.bad { color: var(--bad); }
+  ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  ul.checks li { background: var(--panel); border-radius: 10px; padding: 10px 14px; display: grid;
+    grid-template-columns: 28px 1fr; gap: 6px; align-items: start; }
+  .mark { font-weight: 700; font-size: 18px; line-height: 1.3; }
+  .mark.ok { color: var(--ok); } .mark.bad { color: var(--bad); }
+  .detail { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .detail.bad { color: var(--bad); }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { background: var(--panel-2); position: sticky; top: 0; font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.02); }
+  td.num { white-space: nowrap; color: var(--accent); font-weight: 600; }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); white-space: nowrap; }
+  .tag.project { color: var(--accent); border-color: var(--accent); }
+  .tag.manual { color: var(--warn); border-color: var(--warn); }
+  .chip { display: inline-block; font: 600 13px/1 ui-monospace, Consolas, monospace; background: #444; color: #fff;
+    border-radius: 6px; padding: 5px 8px; margin: 1px 2px; border-bottom: 2px solid #222; }
+  .plus { color: var(--muted); margin: 0 2px; }
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .card { background: var(--panel); border-radius: 12px; padding: 14px 16px; border-top: 3px solid var(--accent); }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .card dl { margin: 0; display: grid; gap: 6px; }
+  .card dt { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .card dd { margin: 0; }
+  .empty { color: var(--muted); font-style: italic; }
+  a { color: var(--accent); }
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Content check <span>·</span> Zedlab Blender Course</h1>
+  <p class="lead">Everything the app will read about the course, taken from BLENDER_Timetable_v3 and made general for every learner. Dates are not written here: the app works them out from each learner's start date.</p>
+  <nav aria-label="Sections">
+    <a href="#checks">Checks</a><a href="#overview">All lessons</a><a href="#weeks">Weeks</a>
+    <a href="#day0">Before you start</a><a href="#lessons">Lesson details</a><a href="#shortcuts">Shortcuts</a>
+    <a href="#glossary">Glossary</a><a href="#standard">Standard</a><a href="#files">File names</a>
+  </nav>
+</header>
+<main id="app"><p>Loading the content…</p></main>
+<footer>Made by Zedlab. Not affiliated with the Blender Foundation.</footer>
+
+<script src="private-words.js"></script>
+<script src="content/lessons.js"></script>
+<script src="content/glossary.js"></script>
+<script src="content/shortcuts.js"></script>
+<script src="content/standard.js"></script>
+<script src="content/visuals.js"></script>
+<script>
+(function () {
+  "use strict";
+  var C = window.COURSE_CONTENT || {};
+  var app = document.getElementById("app");
+  var MANUAL = "https://docs.blender.org/manual/en/5.2/";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function lessonText(n) {
+    var l = n === 0 ? C.beforeYouStart : (C.lessons || []).filter(function (x) { return x.number === n; })[0];
+    if (!l) return "";
+    var parts = [l.title, l.ideaInOneSentence, l.oneIdea, l.youMake, l.proofToSend, l.buildsOn, l.next];
+    if (l.checklist) parts = parts.concat(l.checklist);
+    return parts.join("\n");
+  }
+  function allLessonText() {
+    var t = [lessonText(0)];
+    (C.lessons || []).forEach(function (l) { t.push(lessonText(l.number)); });
+    return t.join("\n");
+  }
+  function chipParts(s) {
+    if (s.type === "menu") return s.keys.split(", ");
+    if (s.type === "place") return [s.keys];
+    return s.keys.split(" + ");
+  }
+  function chips(s) {
+    var sep = s.type === "menu" ? '<span class="plus">›</span>' : '<span class="plus">+</span>';
+    return chipParts(s).map(function (k) { return '<span class="chip">' + esc(k) + "</span>"; }).join(sep);
+  }
+  function lessonLabel(n) {
+    if (n === 0) return "Before you start";
+    var l = (C.lessons || []).filter(function (x) { return x.number === n; })[0];
+    return l ? "Lesson " + n + " (W" + l.week + " D" + l.day + ")" : "Lesson " + n;
+  }
+  function collectStrings(obj, path, out) {
+    if (typeof obj === "string") { out.push({ path: path, text: obj }); return out; }
+    if (Array.isArray(obj)) { obj.forEach(function (v, i) { collectStrings(v, path + "[" + i + "]", out); }); return out; }
+    if (obj && typeof obj === "object") {
+      Object.keys(obj).forEach(function (k) { collectStrings(obj[k], path ? path + "." + k : k, out); });
+    }
+    return out;
+  }
+
+  /* ---------- The checks ---------- */
+  var checks = [];
+  function check(name, problems, okNote) {
+    checks.push({ name: name, ok: problems.length === 0, problems: problems, okNote: okNote || "" });
+  }
+
+  var lessons = C.lessons || [];
+  var weeks = C.weeks || [];
+
+  check("Before you start (Day 0) is there, as a step, not a numbered lesson",
+    C.beforeYouStart && C.beforeYouStart.number === 0 ? [] : ["The before-you-start step is missing."]);
+
+  (function () {
+    var p = [];
+    if (lessons.length !== 29) p.push("Found " + lessons.length + " lessons, expected 29.");
+    lessons.forEach(function (l, i) { if (l.number !== i + 1) p.push("Lesson in place " + (i + 1) + " is numbered " + l.number + "."); });
+    check("There are 29 lessons, numbered 1 to 29 in order", p, lessons.length + " lessons.");
+  })();
+
+  (function () {
+    var p = [], expect = [[1, 5], [6, 10], [11, 15], [16, 20], [21, 25], [26, 29]];
+    if (weeks.length !== 6) p.push("Found " + weeks.length + " weeks, expected 6.");
+    expect.forEach(function (r, i) {
+      var w = weeks[i];
+      if (!w || w.week !== i + 1 || w.firstLesson !== r[0] || w.lastLesson !== r[1])
+        p.push("Week " + (i + 1) + " should be lessons " + r[0] + " to " + r[1] + ".");
+      if (!w || !w.theme) p.push("Week " + (i + 1) + " has no theme.");
+    });
+    lessons.forEach(function (l) {
+      var w = weeks.filter(function (x) { return l.number >= x.firstLesson && l.number <= x.lastLesson; })[0];
+      if (!w) { p.push("Lesson " + l.number + " is in no week."); return; }
+      if (l.week !== w.week) p.push("Lesson " + l.number + " says week " + l.week + ", but it is in week " + w.week + ".");
+      if (l.day !== l.number - w.firstLesson + 1) p.push("Lesson " + l.number + " says day " + l.day + ", expected day " + (l.number - w.firstLesson + 1) + ".");
+    });
+    check("Weeks follow the lessons: 1–5, 6–10, 11–15, 16–20, 21–25, 26–29, each with its theme and day numbers", p,
+      weeks.map(function (w) { return "W" + w.week + ": " + w.theme; }).join(" · "));
+  })();
+
+  (function () {
+    var p = [], expectKind = { 5: "week project", 10: "week project", 15: "week project", 20: "week project", 25: "week project",
+      27: "final project", 28: "final project", 29: "certificate day" };
+    lessons.forEach(function (l) {
+      var k = expectKind[l.number] || "lesson";
+      if (l.kind !== k) p.push("Lesson " + l.number + " is marked “" + l.kind + "”, expected “" + k + "”.");
+    });
+    check("Week projects (lessons 5, 10, 15, 20, 25), final project (27, 28) and certificate day (29) are marked", p);
+  })();
+
+  (function () {
+    var p = [], fields = ["title", "ideaInOneSentence", "oneIdea", "youMake", "proofToSend", "buildsOn", "next"];
+    [C.beforeYouStart].concat(lessons).forEach(function (l) {
+      if (!l) return;
+      fields.forEach(function (f) { if (!l[f] || !String(l[f]).trim()) p.push(lessonLabel(l.number) + ": “" + f + "” is empty."); });
+      if (l.stepByStepGuide !== "") p.push(lessonLabel(l.number) + ": the step-by-step guide box is missing or not empty.");
+    });
+    check("Every lesson has its title, idea, what you'll make, proof, builds on and next, plus an empty step-by-step guide box", p);
+  })();
+
+  (function () {
+    var p = [];
+    [C.beforeYouStart].concat(lessons).forEach(function (l) {
+      if (!l) return;
+      var s = String(l.ideaInOneSentence || "");
+      if (/[.!?]\s+[A-Z0-9]/.test(s) || !/[.!?]$/.test(s)) p.push(lessonLabel(l.number) + ": “" + s + "”");
+    });
+    check("Each short idea is one sentence", p);
+  })();
+
+  (function () {
+    /* Names to look for come from private-words.js, a file that stays on this computer and is never published. */
+    var escapeRe = function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); };
+    var rules = (window.PRIVATE_WORDS || []).filter(Boolean).map(function (w) {
+      return [new RegExp("\\b" + escapeRe(w) + "\\b", "i"), "a private word from private-words.js"];
+    }).concat([
+      [/\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/, "a weekday"],
+      [/\b(January|February|March|April|June|July|August|September|October|November|December)\b/, "a month"],
+      [/\b20\d\d\b/, "a year"], [/\b\d{1,2}:\d{2}\b/, "a clock time"],
+      [/5\.3/, "the next Blender version"], [/Room_v1|own room/i, "a personal file"],
+      [/Zanzibar|Dar_es_Salaam/i, "a time zone"], [/driver|oneAPI|Windows Settings/i, "personal computer details"],
+      [/tell me|reminder|progress report/i, "a personal note"]
+    ]);
+    var p = [];
+    collectStrings(C, "", []).forEach(function (s) {
+      rules.forEach(function (r) {
+        var m = s.text.match(r[0]);
+        if (m) p.push("“" + m[0] + "” (" + r[1] + ") in " + s.path);
+      });
+    });
+    check("No personal names, notes, dates, weekdays, times, computer details or the next version are left", p,
+      (window.PRIVATE_WORDS && window.PRIVATE_WORDS.length ? "Searched every word in the content files, including " + window.PRIVATE_WORDS.length + " private words from private-words.js." : "Searched every word in the content files. No private-words.js on this computer, so names were not checked."));
+  })();
+
+  (function () {
+    var p = [], text = allLessonText();
+    (C.shortcuts || []).forEach(function (s) {
+      var t = lessonText(s.firstLesson);
+      if (t.indexOf(s.asWritten) < 0) p.push("“" + s.asWritten + "” is not in " + lessonLabel(s.firstLesson) + ".");
+      /* Keys, mouse moves and menu paths must match the lesson words exactly.
+         A "place" is the name of something to click, so its name may differ from the lesson words. */
+      if (s.type === "place") return;
+      chipParts(s).forEach(function (k) {
+        if (s.asWritten.toLowerCase().indexOf(k.toLowerCase()) < 0) p.push("Key chip “" + k + "” does not match the lesson words “" + s.asWritten + "”.");
+      });
+    });
+    check("Every shortcut is taught, word for word, in the lesson it is listed under, and its key chips match the lesson", p,
+      (C.shortcuts || []).length + " shortcuts.");
+  })();
+
+  (function () {
+    /* With Emulate Numpad on (Day 0), the top-row keys 1, 2, 3 change the view, even in Edit Mode.
+       The course chooses points, lines or faces with the select mode buttons in the 3D Viewport header. */
+    var p = [];
+    var keyRe = /\b(keys?|press)\s+[123](\s*(,|and|or)\s*[123])*\b|\b[123]\s*,\s*2\s*(,|and|or)\s*3\b|\((\s*key\s*)?[123]\s*\)/i;
+    var whatRe = /\b(points?|lines?|faces?|vertex|vertices|edges?|select(s|ed|ing|ion)?|choose[s]?|choosing)\b/i;
+    collectStrings(C, "", []).forEach(function (s) {
+      s.text.split(/[.!?](?:\s+|$)/).forEach(function (sentence) {
+        if (keyRe.test(sentence) && whatRe.test(sentence)) p.push("“" + sentence.trim() + "” in " + s.path);
+      });
+    });
+    (C.shortcuts || []).forEach(function (s, i) {
+      if (/^[123](\s*(,|and|or)\s*[123])*$/.test(String(s.keys).trim()) && whatRe.test(s.does + " " + s.where))
+        p.push("Shortcut “" + s.keys + "” (" + s.does + ") in shortcuts[" + i + "]");
+    });
+    check("Nothing says keys 1, 2, 3 choose points, lines or faces (with Emulate Numpad on, they change the view; the course uses the select mode buttons)", p);
+  })();
+
+  (function () {
+    var p = [], seen = {};
+    (C.glossary || []).forEach(function (g) {
+      if (seen[g.word.toLowerCase()]) p.push("“" + g.word + "” is in the glossary twice.");
+      seen[g.word.toLowerCase()] = true;
+      var t = lessonText(g.firstLesson).toLowerCase();
+      var forms = [g.word].concat(g.alsoMatches || []);
+      var hit = forms.filter(function (f) { return t.indexOf(f.toLowerCase()) >= 0; });
+      if (!hit.length) p.push("“" + g.word + "” is not in " + lessonLabel(g.firstLesson) + ".");
+      if (!g.meaning) p.push("“" + g.word + "” has no meaning.");
+      if (g.source !== "lessons" && !g.manualPage) p.push("“" + g.word + "” says it was checked in the manual but names no page.");
+    });
+    check("Every glossary word really appears in the lesson it is listed under", p, (C.glossary || []).length + " words.");
+  })();
+
+  (function () {
+    var p = [], found = {};
+    var re = /BLENDER_[A-Za-z0-9_]+(\.[A-Za-z0-9]+)?/g, text = allLessonText(), m;
+    while ((m = re.exec(text))) found[m[0]] = true;
+    Object.keys(found).forEach(function (f) {
+      if (!/^BLENDER_[A-Za-z0-9]+_v\d+\.(blend|png|mp4|glb)$/.test(f)) p.push("“" + f + "” does not follow BLENDER_What_vN.");
+    });
+    check("Every file name the lessons ask for follows BLENDER_What_vN", p, Object.keys(found).length + " file names.");
+    window.__fileNames = Object.keys(found);
+  })();
+
+  (function () {
+    var p = [], st = C.standard || [];
+    if (st.length !== 9) p.push("Found " + st.length + " points, expected 9.");
+    st.forEach(function (s, i) { if (s.point !== i + 1 || !s.text) p.push("Point " + (i + 1) + " is missing or out of order."); });
+    check("The final project standard has its 9 points", p);
+  })();
+
+  (function () {
+    var r = (C.course && C.course.routine) || [];
+    var total = r.reduce(function (a, b) { return a + b.minutes; }, 0);
+    check("The lesson routine adds up to 45 minutes (recap 3, idea 10, build 25, check 5, preview 2)",
+      total === 45 ? [] : ["The routine adds up to " + total + " minutes."]);
+  })();
+
+  /* ---------- Draw the page ---------- */
+  var h = [];
+  var bad = checks.filter(function (c) { return !c.ok; }).length;
+  h.push('<section id="checks" aria-labelledby="h-checks"><h2 id="h-checks">Automatic checks</h2>');
+  h.push('<p class="summary ' + (bad ? "bad" : "ok") + '" role="status">' +
+    (bad ? bad + " of " + checks.length + " checks need fixing." : "All " + checks.length + " checks pass.") + "</p>");
+  h.push('<ul class="checks">');
+  checks.forEach(function (c) {
+    h.push('<li><span class="mark ' + (c.ok ? "ok" : "bad") + '" aria-label="' + (c.ok ? "Passes" : "Needs fixing") + '">' +
+      (c.ok ? "✓" : "✗") + "</span><div>" + esc(c.name) +
+      (c.ok ? (c.okNote ? '<div class="detail">' + esc(c.okNote) + "</div>" : "")
+            : c.problems.map(function (x) { return '<div class="detail bad">' + esc(x) + "</div>"; }).join("")) +
+      "</div></li>");
+  });
+  h.push("</ul></section>");
+
+  h.push('<section id="overview" aria-labelledby="h-ov"><h2 id="h-ov">All lessons at a glance</h2><div class="scroll"><table>' +
+    "<thead><tr><th>No.</th><th>Week, day</th><th>Kind</th><th>Title</th><th>The one idea, in one sentence</th></tr></thead><tbody>");
+  h.push('<tr><td class="num">0</td><td>Before you start</td><td><span class="tag">step</span></td><td>' + esc(C.beforeYouStart.title) +
+    "</td><td>" + esc(C.beforeYouStart.ideaInOneSentence) + "</td></tr>");
+  lessons.forEach(function (l) {
+    h.push('<tr><td class="num">' + l.number + "</td><td>Week " + l.week + ", day " + l.day + '</td><td><span class="tag' +
+      (l.kind !== "lesson" ? " project" : "") + '">' + esc(l.kind) + "</span></td><td>" + esc(l.title) + "</td><td>" +
+      esc(l.ideaInOneSentence) + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  h.push('<section id="weeks" aria-labelledby="h-w"><h2 id="h-w">Week themes</h2><div class="scroll"><table>' +
+    "<thead><tr><th>Week</th><th>Lessons</th><th>Theme</th><th>Note</th></tr></thead><tbody>");
+  weeks.forEach(function (w) {
+    h.push('<tr><td class="num">' + w.week + "</td><td>" + w.firstLesson + " to " + w.lastLesson + "</td><td>" + esc(w.theme) +
+      "</td><td>" + (w.note ? esc(w.note) : '<span class="empty">none</span>') + "</td></tr>");
+  });
+  h.push("</tbody></table></div>");
+  var co = C.course || {};
+  h.push('<div class="cards" style="margin-top:12px"><div class="card"><h3>The course</h3><dl>' +
+    "<dt>Name</dt><dd>" + esc(co.name) + "</dd><dt>Blender version</dt><dd>" + esc(co.blenderVersion) + "</dd>" +
+    "<dt>Render engine</dt><dd>" + esc(co.renderEngine) + "</dd><dt>Goals</dt><dd>" + esc(co.goals) + "</dd></dl></div>" +
+    '<div class="card"><h3>Every lesson, 45 minutes</h3><dl>' +
+    (co.routine || []).map(function (r) { return "<dt>" + r.minutes + " min</dt><dd>" + esc(r.part) + "</dd>"; }).join("") + "</dl></div>" +
+    '<div class="card"><h3>Days off</h3><dl><dt>Every learner starts with</dt><dd>' +
+    (co.defaultDaysOff || []).map(function (d) { return d.day + " December, " + esc(d.name) + ". " + esc(d.note); }).join("<br>") +
+    "</dd><dt>On a day off the app says</dt><dd>" + esc(co.dayOff && co.dayOff.title) + ". " + esc(co.dayOff && co.dayOff.text) + " " +
+    esc(co.dayOff && co.dayOff.practice) + "</dd></dl></div></div></section>");
+
+  function lessonCard(l, isDay0) {
+    var meta = isDay0 ? "Before you start · " + esc(l.length) : "Lesson " + l.number + " · Week " + l.week + ", day " + l.day + " · " + esc(l.kind);
+    var x = '<article class="card"><div class="meta">' + meta + "</div><h3>" + esc(l.title) + "</h3><dl>" +
+      "<dt>The one idea</dt><dd>" + esc(l.oneIdea) + "</dd>" +
+      "<dt>In one sentence</dt><dd>" + esc(l.ideaInOneSentence) + "</dd>" +
+      "<dt>What you'll make</dt><dd>" + esc(l.youMake) + "</dd>" +
+      "<dt>Proof to send</dt><dd>" + esc(l.proofToSend) + "</dd>" +
+      "<dt>Builds on</dt><dd>" + esc(l.buildsOn) + "</dd>" +
+      "<dt>Next</dt><dd>" + esc(l.next) + "</dd>";
+    if (l.checklist) x += "<dt>Checklist</dt><dd><ol style='margin:0;padding-left:18px'>" +
+      l.checklist.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") + "</ol></dd>";
+    x += '<dt>Step-by-step guide</dt><dd class="empty">Empty for now: we fill it in after the lesson.</dd></dl></article>';
+    return x;
+  }
+  h.push('<section id="day0" aria-labelledby="h-d0"><h2 id="h-d0">Before you start (Day 0)</h2><div class="cards">' +
+    lessonCard(C.beforeYouStart, true) + "</div></section>");
+  h.push('<section id="lessons" aria-labelledby="h-l"><h2 id="h-l">Every lesson in full</h2><div class="cards">' +
+    lessons.map(function (l) { return lessonCard(l, false); }).join("") + "</div></section>");
+
+  h.push('<section id="shortcuts" aria-labelledby="h-s"><h2 id="h-s">Shortcut cheat sheet</h2>' +
+    '<p class="lead">Only what the lessons teach. In the app, keys from lessons you have not reached yet show dimmed.</p>' +
+    '<div class="scroll"><table><thead><tr><th>Keys</th><th>What it does</th><th>When</th><th>Taught in</th><th>Lesson words</th></tr></thead><tbody>');
+  (C.shortcuts || []).forEach(function (s) {
+    h.push('<tr><td style="white-space:nowrap">' + chips(s) + "</td><td>" + esc(s.does) + "</td><td>" + (s.where ? esc(s.where) : '<span class="empty">any time</span>') +
+      "</td><td>" + esc(lessonLabel(s.firstLesson)) + "</td><td>“" + esc(s.asWritten) + "”</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  var g = C.glossary || [];
+  var fromManual = g.filter(function (x) { return x.source !== "lessons"; });
+  h.push('<section id="glossary" aria-labelledby="h-g"><h2 id="h-g">Glossary</h2>' +
+    '<p class="lead">' + g.length + " Blender words from the lessons. " + (g.length - fromManual.length) + " are explained in the lessons' own words; " +
+    fromManual.length + ' were checked in the <a href="' + MANUAL + '" rel="noopener">Blender 5.2 manual</a> (marked “manual”).</p>' +
+    '<div class="scroll"><table><thead><tr><th>Word</th><th>Meaning</th><th>First in</th><th>Source</th></tr></thead><tbody>');
+  g.forEach(function (x) {
+    var src = x.source === "lessons" ? '<span class="tag">lessons</span>'
+      : '<span class="tag manual">' + esc(x.source) + '</span><br><a href="' + MANUAL + esc(x.manualPage) + '" rel="noopener">manual page</a>';
+    h.push("<tr><td><strong>" + esc(x.word) + "</strong>" + (x.alsoMatches && x.alsoMatches.length ? '<div class="detail">also: ' +
+      esc(x.alsoMatches.join(", ")) + "</div>" : "") + "</td><td>" + esc(x.meaning) + "</td><td>" + esc(lessonLabel(x.firstLesson)) +
+      "</td><td>" + src + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  h.push('<section id="standard" aria-labelledby="h-st"><h2 id="h-st">Final project standard</h2>' +
+    '<p class="lead">All nine must pass for the certificate.</p><div class="scroll"><table><thead><tr><th>Point</th><th>Label</th><th>The standard</th></tr></thead><tbody>');
+  (C.standard || []).forEach(function (s) {
+    h.push('<tr><td class="num">' + s.point + "</td><td>" + esc(s.short) + "</td><td>" + esc(s.text) + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  h.push('<section id="files" aria-labelledby="h-f"><h2 id="h-f">File names the lessons ask for</h2><div class="scroll"><table>' +
+    "<thead><tr><th>File name</th><th>Asked for in</th></tr></thead><tbody>");
+  (window.__fileNames || []).forEach(function (f) {
+    var where = [];
+    lessons.forEach(function (l) { if (lessonText(l.number).indexOf(f) >= 0) where.push(lessonLabel(l.number)); });
+    h.push("<tr><td><span class='chip'>" + esc(f) + "</span></td><td>" + esc(where.join(", ")) + "</td></tr>");
+  });
+  h.push("</tbody></table></div></section>");
+
+  app.innerHTML = h.join("");
+  document.title = (bad ? "✗ " : "✓ ") + document.title;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson pictures · Zedlab Blender Course</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="app/styles.css">
+<style>
+  .gal-head { max-width: 1200px; margin: 0 auto; padding: var(--space-32) var(--space-24) 0; }
+  .gal { max-width: 1200px; margin: 0 auto; padding: 0 var(--space-24) var(--space-64); }
+  .gal-tools { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: center; margin-top: var(--space-16); }
+  .gal-status { color: var(--label-secondary); font-size: var(--text-footnote); }
+  .gal-checks { list-style: none; display: grid; gap: var(--space-8); margin-top: var(--space-16); }
+  .gal-checks li { display: grid; grid-template-columns: var(--space-24) 1fr; gap: var(--space-8); background: var(--surface-secondary); border-radius: var(--radius-md); padding: var(--space-12) var(--space-16); }
+  .gal-checks .ok { color: var(--success); font-weight: 800; }
+  .gal-checks .bad { color: var(--error); font-weight: 800; }
+  .gal-checks .detail { color: var(--label-secondary); font-size: var(--text-footnote); }
+  .gal-week { margin-top: var(--space-48); }
+  .gal-week-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-8) var(--space-12); }
+  .gal-week-head h2 { font-size: var(--text-title2); font-weight: 750; }
+  .gal-grid { display: grid; gap: var(--space-32) var(--space-24); margin-top: var(--space-16); }
+  @media (min-width: 900px) { .gal-grid { grid-template-columns: 1fr 1fr; } }
+  .gal-item h3 { font-size: var(--text-callout); font-weight: 650; line-height: 1.3; }
+  .gal-item .overline { margin-bottom: var(--space-4); }
+  .gal-item .vis { margin-top: var(--space-12); }
+</style>
+</head>
+<body>
+<header class="gal-head">
+  <p class="overline">Phase 4 · for checking</p>
+  <h1 class="screen-title">Lesson pictures</h1>
+  <p class="screen-lead">One picture for each lesson, with its caption. Only the picture most in view moves; the others show a still frame. Scroll to see each one play.</p>
+  <div class="gal-tools">
+    <button type="button" class="btn btn--small" id="still" aria-pressed="false">Show them all as still pictures</button>
+    <button type="button" class="btn btn--small" id="flat" aria-pressed="false">Show them as on a device without 3D</button>
+    <span class="gal-status" id="status" role="status"></span>
+  </div>
+  <ul class="gal-checks" id="checks"></ul>
+</header>
+<main class="gal" id="gallery"></main>
+<footer class="site-footer" style="margin: 0; padding-bottom: var(--space-32)">Made by Zedlab. Not affiliated with the Blender Foundation.</footer>
+
+<script src="content/lessons.js"></script>
+<script src="content/shortcuts.js"></script>
+<script src="content/standard.js"></script>
+<script src="content/visuals.js"></script>
+<script src="app/calendar.js"></script>
+<script src="app/visuals.js"></script>
+<script>
+(function () {
+  "use strict";
+  const C = window.COURSE_CONTENT, V = window.CourseVisuals;
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const lessonOf = (n) => (n === 0 ? C.beforeYouStart : C.lessons[n - 1]);
+  const label = (n) => (n === 0 ? "Before you start" : window.CourseCalendar.lessonLabel(n, C.weeks));
+
+  /* The automatic checks */
+  const checks = [];
+  const add = (name, problems, note) => checks.push({ name, ok: !problems.length, problems, note });
+  const vis = C.visuals || [];
+  (function () {
+    const p = [], seen = {};
+    vis.forEach((v) => { if (seen[v.lesson]) p.push("Lesson " + v.lesson + " has two pictures."); seen[v.lesson] = true; });
+    for (let n = 0; n <= C.course.lessonCount; n++) if (!seen[n]) p.push(label(n) + " has no picture.");
+    add("There is a picture for Day 0 and every one of the 29 lessons", p, vis.length + " pictures.");
+  })();
+  (function () {
+    const all = V.scenes.solid.concat(V.scenes.flat), p = [];
+    vis.forEach((v) => { if (!all.includes(v.scene)) p.push(label(v.lesson) + " asks for “" + v.scene + "”, which does not exist."); });
+    const used = Array.from(new Set(vis.map((v) => v.scene)));
+    add("Every picture uses one of the shared scene types", p, used.length + " scene types for " + vis.length + " pictures: " + V.scenes.solid.length + " in 3D, " + V.scenes.flat.length + " flat drawings.");
+  })();
+  (function () {
+    const p = [];
+    let count = 0;
+    vis.forEach((v) => v.chips.forEach((c) => {
+      count++;
+      const sc = C.shortcuts.find((s) => s.keys === c.keys);
+      if (!sc) p.push(label(v.lesson) + ": the key chip “" + c.keys + "” is not in the shortcut list.");
+      else if (sc.firstLesson > v.lesson) p.push(label(v.lesson) + ": “" + c.keys + "” is only taught in lesson " + sc.firstLesson + ".");
+      if (!(c.from >= 0 && c.to <= 1 && c.from < c.to)) p.push(label(v.lesson) + ": the timing of “" + c.keys + "” is outside the loop.");
+    }));
+    add("Every key chip is written exactly as in the lessons, and taught by that lesson or earlier", p, count + " key chips.");
+  })();
+  (function () {
+    const p = [];
+    vis.forEach((v) => {
+      if (!v.caption || /[.!?]\s+[A-Z0-9]/.test(v.caption) || !/[.!?]$/.test(v.caption)) p.push(label(v.lesson) + ": “" + v.caption + "”");
+      if (!(v.poster >= 0 && v.poster <= 1)) p.push(label(v.lesson) + ": the still moment is outside the loop.");
+    });
+    add("Every caption is one plain sentence", p);
+  })();
+  const live = { name: "Only one picture moves at a time", ok: true, problems: [], note: "" };
+  checks.push(live);
+
+  function drawChecks() {
+    document.getElementById("checks").innerHTML = checks.map((c) =>
+      `<li><span class="${c.ok ? "ok" : "bad"}" aria-label="${c.ok ? "Passes" : "Needs fixing"}">${c.ok ? "✓" : "✗"}</span><div>${esc(c.name)}` +
+      (c.ok ? (c.note ? `<div class="detail">${esc(c.note)}</div>` : "") : c.problems.map((x) => `<div class="detail">${esc(x)}</div>`).join("")) + "</div></li>").join("");
+  }
+
+  /* The gallery, week by week */
+  const gal = document.getElementById("gallery");
+  const groups = [{ week: 0, theme: "Before you start", nums: [0] }].concat(C.weeks.map((w) => {
+    const nums = []; for (let n = w.firstLesson; n <= w.lastLesson; n++) nums.push(n);
+    return { week: w.week, theme: w.theme, nums };
+  }));
+  groups.forEach((g) => {
+    const sec = document.createElement("section");
+    sec.className = "gal-week";
+    sec.style.setProperty("--wk", g.week ? `var(--week-${g.week})` : "var(--accent)");
+    sec.innerHTML = `<div class="gal-week-head"><span class="tag tag--week">${g.week ? "Week " + g.week : "Day 0"}</span><h2>${esc(g.theme)}</h2></div><div class="gal-grid"></div>`;
+    gal.appendChild(sec);
+    const grid = sec.querySelector(".gal-grid");
+    g.nums.forEach((n) => {
+      const l = lessonOf(n);
+      const art = document.createElement("article");
+      art.className = "gal-item";
+      art.innerHTML = `<p class="overline">${esc(label(n))}</p><h3>${esc(l.title)}</h3>`;
+      grid.appendChild(art);
+      V.mount(art, n);
+    });
+  });
+
+  /* The two switches */
+  const stillBtn = document.getElementById("still"), flatBtn = document.getElementById("flat");
+  stillBtn.addEventListener("click", () => { const on = stillBtn.getAttribute("aria-pressed") !== "true"; stillBtn.setAttribute("aria-pressed", String(on)); V.setForceStill(on); });
+  flatBtn.addEventListener("click", () => { const on = flatBtn.getAttribute("aria-pressed") !== "true"; flatBtn.setAttribute("aria-pressed", String(on)); V.setForceFlat(on); });
+
+  /* Live status, every half second */
+  let worst = 0;
+  setInterval(() => {
+    const playing = document.querySelectorAll(".vis.is-playing").length;
+    worst = Math.max(worst, playing);
+    live.ok = worst <= 1;
+    live.problems = live.ok ? [] : ["At one moment " + worst + " pictures were moving together."];
+    live.note = "Moving now: " + (V.activeLesson() === null ? "none" : label(V.activeLesson())) + ". Still frames made so far: " + V.stillCount() + ".";
+    drawChecks();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById("status").textContent = (V.glSupported() ? "3D works on this device." : "This device cannot show 3D, so the flat drawings are shown.") +
+      (reduce ? " This device asks for less motion, so every picture is a still." : "");
+  }, 500);
+  drawChecks();
+})();
+</script>
+</body>
+</html>
