@@ -4,7 +4,7 @@ A friendly companion for a six-week course in **Blender 5.2 LTS**, made by Zedla
 
 Anyone who opens the link gets their own fresh course. They type their name and start date, and the app builds their personal calendar of 29 lessons. Each lesson has a short animated picture, what to make, what to send as proof, a lesson timer, the keys it teaches and the Blender words it uses. Progress is saved on their own device, with a backup button. There is no login, no database and no tracking.
 
-The app lives at: **https://YOUR-ACCOUNT.github.io/BLENDER_CourseApp/** (replace YOUR-ACCOUNT with the GitHub account name once it is published).
+The app lives at: **https://ignasiawilliam.github.io/BLENDER_CourseApp/**
 
 Made by Zedlab. Not affiliated with the Blender Foundation.
 
