@@ -63,14 +63,27 @@
 
   const items = new Set();
   let active = null, raf = 0;
-  let THREE = null, threeLoad = null, liveRenderer = null, stillRenderer = null, assetsLoad = null, ASSETS = null;
+  /* One renderer for all the pictures (the playing one and the stills), so the whole app uses at most two:
+     this one and the 3D world behind the page (app/scene.js). */
+  let THREE = null, threeLoad = null, liveRenderer = null, assetsLoad = null, ASSETS = null;
   let forceStill = false, forceFlat = false;
   const stillQueue = [];
   let stillBusy = false;
 
-  const glSupported = (() => {
-    try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch (e) { return false; }
-  })();
+  /* Can this device draw 3D? Asked the first time a picture needs to know (not while the app is opening),
+     and the test context is let go at once. */
+  let glKnown = null;
+  function glSupported() {
+    if (glKnown === null) {
+      try {
+        const c = document.createElement("canvas"), gl = c.getContext("webgl2") || c.getContext("webgl");
+        glKnown = !!gl;
+        const lose = gl && gl.getExtension("WEBGL_lose_context");
+        if (lose) lose.loseContext();
+      } catch (e) { glKnown = false; }
+    }
+    return glKnown;
+  }
 
   function loadThree() {
     if (!threeLoad) {
@@ -82,7 +95,7 @@
 
   function makeRenderer() {
     const r = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
-    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); /* sharp enough, and keeps phones cool */
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.VSMShadowMap;
     r.domElement.className = "vis-canvas";
@@ -163,7 +176,7 @@
       img.remove();
       item.premade = false;
       item.stillDone = false;
-      if (glSupported && !forceFlat) queueStill(item); else showFallback(item);
+      if (glSupported() && !forceFlat) queueStill(item); else showFallback(item);
     };
     img.src = stillUrl(item.lessonNumber);
     item.art.insertBefore(img, item.art.firstChild);
@@ -202,7 +215,7 @@
       items.forEach((it) => {
         if (it.ratio >= 0.3 && (!best || it.ratio > best.ratio)) best = it;
       });
-      if (best && best.kind === "solid" && (!glSupported || forceFlat)) best = null;
+      if (best && best.kind === "solid" && (!glSupported() || forceFlat)) best = null;
     }
     if (best === active) return;
     deactivate();
@@ -213,6 +226,14 @@
     active = item;
     item.t0 = performance.now() - item.spec.poster * item.spec.seconds * 1000;
     if (item.kind === "solid") {
+      /* If the background camera is moving (app/scene.js), wait for it to land: building a picture takes a moment,
+         and the move should never stutter. The saved still shows meanwhile. */
+      const wait = window.CourseScene && window.CourseScene.busyFor ? window.CourseScene.busyFor() : 0;
+      if (wait > 0) {
+        await new Promise((res) => setTimeout(res, wait + 30));
+        if (active !== item) return;
+        item.t0 = performance.now() - item.spec.poster * item.spec.seconds * 1000;
+      }
       const ok = await ensureThree();
       if (active !== item) return;
       if (!ok) { showFallback(item); active = null; return; }
@@ -267,7 +288,7 @@
   /* Still frames for 3D pictures, made one at a time with a second, hidden renderer. */
   function queueStill(item) {
     if (item.kind !== "solid" || item.premade || item.stillDone || stillQueue.includes(item)) return;
-    if (!glSupported || forceFlat) { showFallback(item); return; }
+    if (!glSupported() || forceFlat) { showFallback(item); return; }
     stillQueue.push(item);
     runStills();
   }
@@ -282,13 +303,15 @@
       if (!ok) { showFallback(item); continue; }
       const w = Math.round(item.stage.clientWidth), h = Math.round(item.stage.clientHeight);
       if (!w || !h) { item.stillDone = false; continue; }
-      if (!stillRenderer) stillRenderer = makeRenderer();
-      stillRenderer.setSize(w, h, false);
-      const live = buildSolid(item, stillRenderer);
+      /* The still is drawn with the same renderer as the playing picture; the playing picture
+         redraws itself on the very next frame, before anything is shown. */
+      if (!liveRenderer) liveRenderer = makeRenderer();
+      liveRenderer.setSize(w, h, false);
+      const live = buildSolid(item, liveRenderer);
       live.resize(w, h);
       live.update(item.spec.poster);
-      stillRenderer.render(live.scene, live.camera);
-      const url = stillRenderer.domElement.toDataURL("image/jpeg", 0.88);
+      liveRenderer.render(live.scene, live.camera);
+      const url = liveRenderer.domElement.toDataURL("image/jpeg", 0.88);
       const img = new Image();
       img.alt = "";
       img.className = "vis-still";
@@ -309,7 +332,7 @@
   }
 
   async function ensureThree() {
-    if (!glSupported || forceFlat) return false;
+    if (!glSupported() || forceFlat) return false;
     const m = await loadThree();
     if (!m) return false;
     if (!assetsLoad) assetsLoad = loadAssets();
@@ -1595,7 +1618,7 @@
   window.CourseVisuals = {
     mount, unmount, unmountAll,
     scenes: { solid: Object.keys(SOLID), flat: Object.keys(FLAT) },
-    glSupported: () => glSupported,
+    glSupported,
     setForceStill(v) { forceStill = !!v; chooseActive(); },
     setForceFlat(v) {
       forceFlat = !!v;

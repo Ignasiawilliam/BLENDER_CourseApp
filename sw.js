@@ -8,14 +8,17 @@
   "New version ready, tap to update". Tapping it reloads the app with the new files.
 
   If you add a new file the app needs, add it to the list below.
+  When you publish a bigger change, also change VERSION: phones then fetch every file fresh,
+  and anyone with the app open sees "New version ready, tap to update".
 */
+const VERSION = "2026-11-09 design update (Plus Jakarta Sans, Pweza, 3D viewport, orange icons)";
 const CACHE = "zedlab-blender-course";
 
 const FILES = [
   "./", "index.html", "manifest.webmanifest",
-  "app/styles.css", "app/calendar.js", "app/store.js", "app/files.js", "app/visuals.js", "app/app.js",
+  "app/styles.css", "app/calendar.js", "app/store.js", "app/files.js", "app/visuals.js", "app/scene.js", "app/pweza.js", "app/app.js",
   "content/lessons.js", "content/glossary.js", "content/shortcuts.js", "content/standard.js", "content/visuals.js",
-  "fonts/InterVariable.woff2", "Zedlab_logo.svg", "Zedlab_octopus_logo.svg",
+  "fonts/PlusJakartaSans-latin.woff2", "fonts/PlusJakartaSans-latin-ext.woff2", "Zedlab_logo.svg", "Zedlab_octopus_logo.svg",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png",
   "vendor/three/three.module.min.js", "vendor/three/three.core.min.js"
 ];
@@ -25,11 +28,14 @@ for (let n = 0; n <= 29; n++) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then((cache) => Promise.all(FILES.map((f) => cache.add(new Request(f, { cache: "reload" })).catch(() => null))))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    /* If files were saved before, this is a new version: save every file fresh, then say so */
+    const isUpdate = await caches.has(CACHE);
+    const cache = await caches.open(CACHE);
+    await Promise.all(FILES.map((f) => cache.add(new Request(f, { cache: "reload" })).catch(() => null)));
+    if (isUpdate) await tellPages();
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => { event.waitUntil(self.clients.claim()); });
@@ -47,7 +53,7 @@ function changed(saved, fresh) {
 let updatedAt = 0;
 async function tellPages() {
   updatedAt = Date.now();
-  const pages = await self.clients.matchAll({ type: "window" });
+  const pages = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
   pages.forEach((p) => p.postMessage({ type: "update-ready" }));
 }
 

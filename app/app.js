@@ -59,6 +59,7 @@
     right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+    down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
     timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 2.5h5"/></svg>'
   };
 
@@ -149,6 +150,8 @@
 
   function celebrate(big) {
     if (reduceMotion.matches) return;
+    /* Small orange cubes drop and bounce in the 3D world. Without 3D, confetti instead. */
+    if (window.CourseScene && window.CourseScene.drop(big)) return;
     const box = document.createElement("div");
     box.className = "confetti";
     box.setAttribute("aria-hidden", "true");
@@ -163,6 +166,125 @@
     document.body.appendChild(box);
     setTimeout(() => box.remove(), 2700);
   }
+
+  /* ---------- Pweza, the teacher ---------- */
+  /*
+    One Pweza per screen, in his own row at the top, about 56 px, with his speech bubble.
+    Today shows one mood at a time, the most urgent first. Big moments (lesson done, week project,
+    certificate, restore) show him at about 140 px in the middle of the screen for about 2 seconds;
+    taps pass straight through him. A few small flags (certificate already celebrated) are kept
+    outside the course data, so they never go into a backup.
+  */
+  const PZ = window.Pweza;
+  let pz = null, pzKey = "", pzWhere = "", pzFlash = null, pzMinute = -1, moment = null;
+  const SEEN_KEY = "zedlabBlenderCourse.seen";
+  function seen(k) { try { return !!JSON.parse(localStorage.getItem(SEEN_KEY) || "{}")[k]; } catch (e) { return false; } }
+  function markSeen(k) { try { const o = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); o[k] = true; localStorage.setItem(SEEN_KEY, JSON.stringify(o)); } catch (e) { /* not saved: fine */ } }
+  const TIMER_MOODS = ["recap", "idea", "build", "check", "preview"];
+
+  function spokenName() {
+    const w = S ? firstName() : "";
+    if (w !== w.toUpperCase() && w !== w.toLowerCase()) return w;
+    return w.toLowerCase().replace(/(^|[-'\u2019])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+  }
+  function currentPage() { return S ? (location.hash.replace(/^#\/?/, "").split("/")[0] || "today") : "setup"; }
+
+  /* Which mood (if any) Today should show, the most urgent first */
+  function todayPweza() {
+    if (pzFlash && pzFlash.until > Date.now()) return { mood: pzFlash.mood };
+    const t = todayKey(), s = schedule();
+    if (s.problem) return null;
+    const todays = Cal.lessonOn(s, t);
+    if (S.timer && todays && S.timer.lesson === todays) {
+      const i = timerInfo(Date.now());
+      if (!i.finished) return { mood: TIMER_MOODS[Math.min(i.index, 4)] };
+    }
+    if (todays && !isDone(todays)) {
+      const start = lessonStart(t), left = start - Date.now();
+      if (left > 0 && left <= 15 * 60000) return { mood: "soon" };
+    }
+    if (s.lessons.find((l) => l.date < t && !isDone(l.number))) return { mood: "catchup" };
+    if (Cal.weekday(t) === 5 && S.lastBackup !== t) return { mood: "friday" };
+    const h = new Date().getHours();
+    if (h >= 21 || h < 5) return { mood: "late" };
+    if (!navigator.onLine) return { mood: "offline" };
+    if (t < s.lessons[0].date) return { mood: "hello" };
+    if (todays) return { mood: "today", vars: { title: lessonData(todays).title } };
+    return null;
+  }
+  function pwezaFor(page) {
+    if (!S) return { mood: "hello" };
+    if (page === "today") return todayPweza();
+    if (page === "certificate" && certStatus().ready) return { mood: "cert" };
+    if (!navigator.onLine && page !== "lesson") return { mood: "offline" };
+    return null;
+  }
+  function dropPweza() {
+    if (pz) { pz.destroy(); pz = null; }
+    pzKey = "";
+    main.querySelectorAll(".pz-row").forEach((r) => r.remove());
+  }
+  /* Put the right Pweza on the current screen (or update his mood, or take him away) */
+  function placePweza() {
+    if (!PZ) return;
+    const want = pwezaFor(currentPage());
+    if (!want) { dropPweza(); return; }
+    const vars = Object.assign({ first: spokenName() }, want.vars || {});
+    /* While the timer runs he sits small inside the timer box, next to the part name */
+    const slot = TIMER_MOODS.includes(want.mood) ? main.querySelector(".timer-pz") : null;
+    const where = slot ? "timer" : "row";
+    const key = where + "|" + want.mood + "|" + (vars.title || "");
+    if (pz && pz.el.isConnected && pzWhere === where) {
+      if (key !== pzKey) { pz.setMood(want.mood, vars); pzKey = key; }
+    } else {
+      dropPweza();
+      if (slot) pz = PZ.create(slot, { mood: want.mood, size: 48, vars, bubble: false });
+      else {
+        const row = document.createElement("div");
+        row.className = "pz-row enter";
+        main.insertBefore(row, main.firstChild);
+        pz = PZ.create(row, { mood: want.mood, size: 56, vars });
+      }
+      pzWhere = where; pzKey = key;
+    }
+    hideDuringMoment();
+  }
+  /* Only one Pweza on screen: while a big moment plays, any other Pweza waits out of sight */
+  function hideDuringMoment() {
+    const host = pz && (pz.el.closest(".pz-row") || pz.el);
+    if (host) host.style.visibility = moment ? "hidden" : "";
+  }
+  /* A big moment in the middle of the screen; the row Pweza steps aside so there is only ever one */
+  function bigMoment(mood, vars) {
+    if (!PZ) return;
+    if (moment) { clearTimeout(moment.t1); clearTimeout(moment.t2); moment.big.destroy(); moment.layer.remove(); moment.dim.remove(); moment = null; }
+    /* Two layers: the soft dark backdrop, and Pweza above it. The "I did it" cubes fall between the two,
+       so they never cover his face. */
+    const dim = document.createElement("div");
+    dim.className = "pz-moment-dim";
+    const layer = document.createElement("div");
+    layer.className = "pz-moment";
+    dim.setAttribute("aria-hidden", "true");
+    layer.setAttribute("aria-hidden", "true"); /* the toast already says it in words */
+    document.body.append(dim, layer);
+    const big = PZ.create(layer, { mood, size: 140, layout: "stack", vars: Object.assign({ first: spokenName() }, vars || {}) });
+    const m = { layer, dim, big, t1: 0, t2: 0 };
+    moment = m;
+    hideDuringMoment();
+    requestAnimationFrame(() => { dim.classList.add("is-on"); layer.classList.add("is-on"); });
+    m.t1 = setTimeout(() => {
+      dim.classList.remove("is-on");
+      layer.classList.remove("is-on");
+      m.t2 = setTimeout(() => { big.destroy(); layer.remove(); dim.remove(); if (moment === m) { moment = null; hideDuringMoment(); } }, 320);
+    }, 2300);
+  }
+  /* The certificate unlocks: celebrate once */
+  function checkCertMoment() {
+    if (S && certStatus().ready && !seen("cert")) { markSeen("cert"); bigMoment("cert"); return true; }
+    return false;
+  }
+  window.addEventListener("online", placePweza);
+  window.addEventListener("offline", placePweza);
 
   function noticeHtml(html, kind) {
     return `<div class="notice ${kind === "kind" ? "notice--kind" : ""} enter" role="status"><div>${html}</div></div>`;
@@ -230,8 +352,15 @@
         <div class="actions"><button type="button" class="btn btn--small btn--ghost" data-action="timer-stop">Close the timer</button></div></div>`;
     }
     const p = i.parts[i.index];
+    const say = PZ ? PZ.lineFor(TIMER_MOODS[Math.min(i.index, 4)], {}) : "";
     return `<div class="timer" role="group" aria-label="Lesson timer">
-      <p class="timer-phase">${i.paused ? "Paused · " : ""}Part ${i.index + 1} of ${i.parts.length}: ${esc(p.part)} · ${p.minutes} min</p>
+      <div class="timer-head">
+        ${PZ ? '<div class="timer-pz" aria-hidden="true"></div>' : ""}
+        <div class="timer-head-text">
+          <p class="timer-phase">${i.paused ? "Paused · " : ""}Part ${i.index + 1} of ${i.parts.length}: ${esc(p.part)} · ${p.minutes} min</p>
+          ${say ? `<p class="pz-say timer-say">${esc(say)}</p>` : ""}
+        </div>
+      </div>
       <p class="timer-time" id="timer-time" aria-hidden="true">${clock(i.left)}</p>
       <ol class="timer-steps">${i.parts.map((x, k) =>
         `<li class="${k < i.index ? "is-done" : k === i.index ? "is-current" : ""}">${esc(x.part)}<br>${x.minutes} min</li>`).join("")}</ol>
@@ -245,6 +374,7 @@
   function redrawTimer() {
     const box = document.getElementById("timer-box");
     if (box && S.timer) box.innerHTML = timerHtml(S.timer.lesson);
+    placePweza();
   }
 
   /* Runs every second while a screen is open: the countdown, the timer, and a new day at midnight. */
@@ -253,6 +383,9 @@
     if (renderedDay && renderedDay !== todayKey()) { route(); return; }
     const cd = document.getElementById("countdown");
     if (cd && cd.dataset.n) cd.innerHTML = countdownHtml(+cd.dataset.n, cd.dataset.date, todayKey());
+    /* Pweza on Today follows the clock: 15 minutes before, after 21:00, and the timer's parts */
+    const minute = Math.floor(Date.now() / 60000);
+    if (minute !== pzMinute) { pzMinute = minute; if (currentPage() === "today") placePweza(); }
     if (S.timer && document.getElementById("timer-box")) {
       const i = timerInfo(Date.now());
       if (i.index !== lastPhase) {
@@ -262,6 +395,7 @@
         }
         lastPhase = i.index;
         redrawTimer();
+        placePweza();
       } else if (!i.finished) {
         const el = document.getElementById("timer-time");
         if (el) el.textContent = clock(i.left);
@@ -525,15 +659,30 @@
     return `<div class="two-up">${recap}${teaser}</div>`;
   }
 
+  /* Slim one-line strips on Today (Friday, catch-up), so the lesson card stays in view on a phone.
+     Pweza says the words in his bubble; the strip holds the one thing to do. Tap the words for more. */
+  function stripHtml(words, href, button) {
+    return `<div class="strip enter" role="status"><a class="strip-text" href="${href}"><span class="strip-words">${words}</span>${ICON.right}</a>${button}</div>`;
+  }
+
   function catchUpHtml(b, t) {
-    const preview = Cal.catchUp(S.plan, b.number, t, WEEKS);
+    return stripHtml(`<strong>${esc(labelOf(b.number))}</strong> isn't ticked yet`, `#/lesson/${b.number}`,
+      `<button type="button" class="btn btn--small" data-action="catchup-choose" data-n="${b.number}">Catch up</button>`);
+  }
+
+  /* "Catch up": the same three choices the old notice had, in a small window. */
+  async function catchUpChoose(n) {
+    const t = todayKey(), s = schedule(), l = lessonData(n);
+    const preview = Cal.catchUp(S.plan, n, t, WEEKS);
     const to = preview.change ? preview.change.to : t;
-    return noticeHtml(`<p><strong>${esc(labelOf(b.number))}</strong> was on ${esc(Cal.formatNoYear(b.date))} and isn't ticked yet: ${esc(lessonData(b.number).title)}.</p>
-      <div class="actions">
-        <button type="button" class="btn btn--small" data-action="done" data-n="${b.number}">I did it</button>
-        <button type="button" class="btn btn--small btn--ghost" data-action="catchup" data-n="${b.number}">Move it to ${to === t ? "today" : esc(Cal.formatNoYear(to))}</button>
-        <a class="btn btn--small btn--ghost" href="#/lesson/${b.number}">Open it</a>
-      </div>`);
+    const r = await openDialog({
+      title: `${labelOf(n)} isn't ticked yet`,
+      html: `<p class="dlg-text">${esc(l.title)}. It was on ${esc(Cal.formatNoYear(Cal.dateOf(s, n)))}.</p>`,
+      actions: [{ label: "Open it", value: "open" }, { label: `Move it to ${to === t ? "today" : Cal.formatNoYear(to)}`, value: "move" }, { label: "I did it", value: "done", primary: true }]
+    });
+    if (r.value === "done") markDone(n);
+    else if (r.value === "move") catchUp(n);
+    else if (r.value === "open") go("#/lesson/" + n);
   }
 
   function beforeStartHtml(s, t) {
@@ -820,6 +969,7 @@
     celebrate(big);
     toast(l.kind === "week project" ? `Week ${l.week} project done. That's the whole of week ${l.week}!` : `${labelOf(n)} done. Nice work.`);
     route();
+    if (!checkCertMoment()) bigMoment(l.kind === "week project" ? "week" : "done", { week: l.week });
   }
 
   function markUndone(n) {
@@ -842,6 +992,7 @@
     if (S.timer && S.timer.lesson === n) S.timer = null;
     save();
     flash = preview.change.kindMessage;
+    pzFlash = { mood: "cant", until: Date.now() + 60000 };
     route();
     main.focus();
   }
@@ -913,6 +1064,7 @@
       case "undone": markUndone(n); break;
       case "cant": cantToday(n); break;
       case "catchup": catchUp(n); break;
+      case "catchup-choose": catchUpChoose(n); break;
       case "copy": copyTutor(n); break;
       case "timer-start": case "timer-pause": case "timer-next": case "timer-stop": timerAction(el.dataset.action, n); break;
       case "month": {
@@ -954,7 +1106,7 @@
       S.standard = S.standard || [];
       S.standard[+el.dataset.i] = el.checked;
       save();
-      if (el.checked && C.standard.every((_, i) => S.standard[i])) { celebrate(true); toast("All nine points ticked."); }
+      if (el.checked && C.standard.every((_, i) => S.standard[i])) { celebrate(true); toast("All nine points ticked."); checkCertMoment(); }
       return;
     }
     if (el.name === "st-theme") { S.settings.theme = el.value; save(); applyTheme(); return; }
@@ -962,6 +1114,7 @@
   });
   main.addEventListener("input", (e) => {
     if (e.target.id === "g-search") { filterGlossary(e.target.value); return; }
+    if (e.target.id === "k-search") { filterShortcuts(e.target.value); return; }
     if (e.target.closest && e.target.closest("#setup")) updatePreview();
   });
   main.addEventListener("submit", (e) => {
@@ -973,6 +1126,7 @@
       save();
       toast(S.reviewer ? "Saved." : "The name was cleared.");
       route();
+      checkCertMoment();
     }
   });
 
@@ -1024,8 +1178,8 @@
         <span class="muted small">${esc(Cal.formatShort(l.date))}${isDone(l.number) ? "" : l.date < t ? " · not ticked" : ""}</span></li>`).join("")}</ul>` : ""}
       ${notes.length ? `<h3 class="section-title">What was hard</h3><ul class="plain-list">${notes.map((l) => `<li><strong>${esc(labelOf(l.number))}:</strong> ${esc(S.done[l.number].hard)}</li>`).join("")}</ul>` : ""}
       ${next ? `<p class="muted">Next week: ${esc(labelOf(next.number))}, ${esc(lessonData(next.number).title)}.</p>` : ""}
-      <div class="actions"><button type="button" class="btn ${friday ? "btn--primary" : ""}" data-action="backup">Download a backup</button></div>
-      <p class="small muted">A good habit: download a backup every Friday and keep it somewhere safe.</p>
+      <div class="actions"><button type="button" class="btn ${friday ? "btn--primary" : ""}" data-action="backup">Save a backup</button></div>
+      <p class="small muted">A good habit: save a backup every Friday and keep it somewhere safe.</p>
     </section>`;
   }
 
@@ -1034,8 +1188,8 @@
     const [mon, sun] = weekRange(t);
     const list = s.lessons.filter((l) => l.date >= mon && l.date <= sun);
     const doneN = list.filter((l) => isDone(l.number)).length;
-    return noticeHtml(`<p><strong>It's Friday.</strong> ${list.length ? `You ticked ${doneN} of ${list.length} lessons this week. ` : ""}Time for your week report and a backup.</p>
-      <div class="actions"><a class="btn btn--small" href="#/progress">See this week</a><button type="button" class="btn btn--small btn--ghost" data-action="backup">Download a backup</button></div>`);
+    return stripHtml(`<strong>Friday</strong>${list.length ? ` · ${doneN} of ${list.length} ticked this week` : " · your week report"}`, "#/progress",
+      `<button type="button" class="btn btn--small" data-action="backup">Save a backup</button>`);
   }
 
   function renderProgress() {
@@ -1050,7 +1204,7 @@
     }).join("");
     const projects = WEEKS.filter((w) => w.week < 6).map((w) => ({ n: w.lastLesson, name: `Week ${w.week} project`, short: `W${w.week}`, wk: `var(--week-${w.week})` }))
       .concat([{ n: COUNT, name: "Final project", short: "Final", wk: "var(--accent); --wk-ink: var(--on-accent)" }]);
-    const badges = projects.map((b) => `<li class="badge ${isDone(b.n) ? "is-earned" : ""}" style="--wk: ${b.wk}">
+    const badges = projects.map((b) => `<li class="badge ${isDone(b.n) ? "is-earned" : ""}" data-badge="${b.n}" style="--wk: ${b.wk}">
         <span class="badge-disc" aria-hidden="true">${isDone(b.n) ? ICON.star : ""}<b>${esc(b.short)}</b></span>
         <span class="badge-name">${esc(b.name)}</span><span class="small muted">${isDone(b.n) ? "Earned" : "Not yet"}</span></li>`).join("");
     const hard = LESSONS.filter((l) => isDone(l.number) && S.done[l.number].hard);
@@ -1077,6 +1231,20 @@
       <section class="card enter" aria-labelledby="log-title"><h2 class="card-title" id="log-title">Changes to your timetable</h2>
         ${missed.length ? `<p class="muted">Days marked “Can't today” or moved: ${missed.map((d) => esc(Cal.formatShort(d))).join(", ")}.</p>` : ""}
         ${changes.length ? `<ul class="log-list">${changes.map((c) => `<li>${esc(c.text)}</li>`).join("")}</ul>` : '<p class="muted">No changes yet. Every change gets a dated line here.</p>'}</section>`;
+    turnNewBadges();
+  }
+
+  /* A finished project's badge turns once, in 3D, the first time it comes into view. */
+  let badgeIO = null;
+  function turnNewBadges() {
+    const fresh = Array.from(main.querySelectorAll(".badge.is-earned[data-badge]")).filter((b) => !seen("badge-" + b.dataset.badge));
+    if (!fresh.length) return;
+    const turn = (b) => { b.classList.add("is-turning"); markSeen("badge-" + b.dataset.badge); };
+    if (!("IntersectionObserver" in window)) { fresh.forEach(turn); return; }
+    badgeIO = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { badgeIO.unobserve(e.target); turn(e.target); }
+    }), { threshold: 0.6 });
+    fresh.forEach((b) => badgeIO.observe(b));
   }
 
   /* ---------- Toolbox: shortcuts, glossary, standard ---------- */
@@ -1103,12 +1271,23 @@
         if (!g) { g = { n: sc.firstLesson, items: [] }; groups.push(g); }
         g.items.push(sc);
       });
-      body = `<p class="muted enter">Keys you have learnt so far are bright; keys from later lessons are dimmed.</p>` + groups.map((g) => {
-        const future = g.n > up;
-        return `<section class="card tool-group enter ${future ? "is-future" : ""}" style="${weekVar(g.n)}" aria-labelledby="sg-${g.n}">
-          <p class="overline">${future ? "Coming later · " : ""}${esc(labelOf(g.n))}</p>
+      const rows = (g) => `<ul class="shortcut-list">${g.items.map((sc) => `<li data-text="${esc([sc.keys, sc.does, sc.where || "", labelOf(g.n), lessonData(g.n).title].join(" ").toLowerCase())}">${chipsHtml(sc)}<span>${esc(sc.does)}${sc.where ? ` <span class="muted small">${esc(sc.where)}</span>` : ""}</span></li>`).join("")}</ul>`;
+      body = `<div class="field enter"><label class="label" for="k-search">Search keys and buttons</label>
+          <input class="input" type="search" id="k-search" autocomplete="off" placeholder="For example: extrude"></div>
+        <p class="muted small enter" id="k-count" aria-live="polite">${shortcutCountText("")}</p>` + groups.map((g) => {
+        if (g.n <= up) {
+          return `<section class="card tool-group enter" style="${weekVar(g.n)}" aria-labelledby="sg-${g.n}">
+          <p class="overline">${esc(labelOf(g.n))}</p>
           <h2 class="card-title" id="sg-${g.n}"><a href="#/lesson/${g.n}">${esc(lessonData(g.n).title)}</a></h2>
-          <ul class="shortcut-list">${g.items.map((sc) => `<li>${chipsHtml(sc)}<span>${esc(sc.does)}${sc.where ? ` <span class="muted small">${esc(sc.where)}</span>` : ""}</span></li>`).join("")}</ul></section>`;
+          ${rows(g)}</section>`;
+        }
+        /* coming later: folded closed; tap to look ahead */
+        return `<details class="card tool-group is-future enter" style="${weekVar(g.n)}">
+          <summary class="tool-sum"><span class="overline">Coming later · ${esc(labelOf(g.n))}</span>
+            <h2 class="tool-sum-title" id="sg-${g.n}">${esc(lessonData(g.n).title)}</h2>
+            <span class="tool-sum-n">${g.items.length} ${g.items.length === 1 ? "shortcut" : "shortcuts"}${ICON.down}</span></summary>
+          ${rows(g)}
+          <p class="tool-open"><a href="#/lesson/${g.n}">Open ${esc(labelOf(g.n))}</a></p></details>`;
       }).join("");
     } else if (which === "glossary") {
       const sorted = C.glossary.slice().sort((a, b) => a.word.replace(/^\./, "").localeCompare(b.word.replace(/^\./, ""), "en", { sensitivity: "base" }));
@@ -1130,6 +1309,34 @@
       const el = document.getElementById(slug(decodeURIComponent(focusWord)));
       if (el) { el.classList.add("is-hit"); el.scrollIntoView({ block: "center", behavior: reduceMotion.matches ? "auto" : "smooth" }); }
     }
+  }
+
+  function shortcutCountText(q, shown) {
+    if (!q) return `${C.shortcuts.length} keys and buttons. Lessons coming later are folded: tap one to look ahead.`;
+    if (!shown) return `Nothing matches “${esc(q)}”. Try another word, or look in the <a href="#/toolbox/glossary">Glossary</a>.`;
+    return shown === 1 ? "1 key or button found." : `${shown} keys and buttons found.`;
+  }
+
+  /* Shortcuts search: matching rows stay, the rest hide; a folded lesson with a match opens while you search. */
+  function filterShortcuts(q) {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+    main.querySelectorAll(".tool-group").forEach((g) => {
+      let hits = 0;
+      g.querySelectorAll(".shortcut-list li[data-text]").forEach((li) => {
+        const hit = words.every((w) => li.dataset.text.indexOf(w) >= 0);
+        li.hidden = !hit;
+        if (hit) hits++;
+      });
+      shown += hits;
+      g.hidden = !hits;
+      if (g.tagName === "DETAILS") {
+        if (words.length && hits && !g.open) { g.open = true; g.dataset.auto = "1"; }
+        else if (!words.length && g.dataset.auto) { g.open = false; delete g.dataset.auto; }
+      }
+    });
+    const c = document.getElementById("k-count");
+    if (c) c.innerHTML = shortcutCountText(q.trim(), shown);
   }
 
   function filterGlossary(q) {
@@ -1315,15 +1522,15 @@
         </div></section>
 
       <section class="card enter" aria-labelledby="set-backup"><h2 class="card-title" id="set-backup">Backup</h2>
-        <p class="muted">One file, ${esc(Files.backupFileName(t))}, with your progress, notes, dates and pictures. Keep it somewhere safe, such as your email or a cloud drive. A good habit: download one every Friday.</p>
+        <p class="muted">One file, ${esc(Files.backupFileName(t))}, with your progress, notes, dates and pictures. Keep it somewhere safe, such as your email or a cloud drive. A good habit: save one every Friday.</p>
         ${S.lastBackup ? `<p class="small muted">Last backup: ${esc(Cal.formatLong(S.lastBackup))}.</p>` : ""}
-        <div class="actions"><button type="button" class="btn btn--primary" data-action="backup">Download a backup</button>
+        <div class="actions"><button type="button" class="btn btn--primary" data-action="backup">Save a backup</button>
           <button type="button" class="btn btn--ghost" data-action="restore">Restore from a backup</button></div></section>
 
       <section class="card enter" aria-labelledby="set-ics"><h2 class="card-title" id="set-ics">Phone calendar</h2>
         <p class="muted">Adds all ${COUNT} lessons to your phone's calendar, each with an alert 15 minutes before.</p>
-        <div class="actions"><button type="button" class="btn" data-action="ics">Download BLENDER_Calendar_v1.ics</button></div>
-        <p class="small muted">Open the file on your phone to add the lessons. If your dates change, download it again.</p></section>
+        <div class="actions"><button type="button" class="btn" data-action="ics">Save BLENDER_Calendar_v1.ics</button></div>
+        <p class="small muted">Open the file on your phone to add the lessons. If your dates change, save it again.</p></section>
 
       <section class="card enter" aria-labelledby="set-home"><h2 class="card-title" id="set-home">Put it on your home screen</h2>
         ${window.matchMedia("(display-mode: standalone)").matches ? '<p class="muted">You are using the app from your home screen. It works without internet.</p>' : `
@@ -1335,7 +1542,7 @@
       <section class="card enter" aria-labelledby="set-pass"><h2 class="card-title" id="set-pass">How to pass this app on</h2>
         <p>Send the link to anyone who wants to learn Blender 5.2 LTS. When they open it, they get their own fresh, empty course and set it up in under a minute.</p>
         <p>Your course stays on your device. Nobody else can see it, and theirs doesn't change yours.</p>
-        <p>New phone? Download a backup here, send the file to yourself, open the app on the new phone and choose “Restore from backup”.</p></section>
+        <p>New phone? Save a backup here, send the file to yourself, open the app on the new phone and choose “Restore from backup”.</p></section>
 
       <section class="card enter" aria-labelledby="set-reset"><h2 class="card-title" id="set-reset">Start again</h2>
         <p class="muted">Deletes your course, notes and pictures from this device, and goes back to set-up.</p>
@@ -1391,7 +1598,7 @@
   }
 
   async function resetCourse() {
-    const a = await openDialog({ title: "Reset the course?", html: '<p class="dlg-text">This deletes your progress, notes and pictures from this device and goes back to set-up. Download a backup first if you might want them.</p>',
+    const a = await openDialog({ title: "Reset the course?", html: '<p class="dlg-text">This deletes your progress, notes and pictures from this device and goes back to set-up. Save a backup first if you might want them.</p>',
       actions: [{ label: "Keep my course", value: "cancel" }, { label: "Reset", value: "go", primary: true }] });
     if (a.value !== "go") return;
     const b = await openDialog({ title: "Are you sure?", html: '<p class="dlg-text">This can\'t be undone without a backup.</p>',
@@ -1399,6 +1606,7 @@
     if (b.value !== "go") return;
     await Store.pictures.clear();
     Store.clear();
+    try { localStorage.removeItem(SEEN_KEY); } catch (e) { /* nothing saved */ }
     S = null;
     setupDaysOff = null;
     applyTheme();
@@ -1414,11 +1622,13 @@
     const withData = [];
     for (const p of pics) withData.push({ id: p.id, lesson: p.lesson, addedOn: p.addedOn, w: p.w, h: p.h, data: await Files.blobToDataUrl(p.blob) });
     const name = Files.backupFileName(todayKey());
-    Files.download(name, Files.makeBackup(S, withData), "application/json");
+    const how = await Files.saveFile(name, Files.makeBackup(S, withData), "application/json");
+    if (how === "cancelled") { toast("Backup not saved."); return; }
     S.lastBackup = todayKey();
     save();
-    toast(`Backup downloaded: ${name}, with ${pics.length} picture${pics.length === 1 ? "" : "s"}.`);
-    if (location.hash.indexOf("#/settings") === 0) route();
+    toast(`Backup ${how === "shared" ? "shared" : "downloaded"}: ${name}, with ${pics.length} picture${pics.length === 1 ? "" : "s"}.`);
+    /* Settings shows the new date; on Today the Friday strip goes away */
+    if (/^#\/(settings|today)/.test(location.hash)) route();
   }
 
   async function restoreBackup() {
@@ -1450,25 +1660,29 @@
     save();
     applyTheme();
     setupDaysOff = null;
-    flash = `Welcome back, ${firstName()}. Your course is restored: ${doneN} lesson${doneN === 1 ? "" : "s"} done.`;
+    flash = `Welcome back, ${spokenName()}. Your course is restored: ${doneN} lesson${doneN === 1 ? "" : "s"} done.`;
     go("#/today");
+    bigMoment("welcome");
   }
 
-  function downloadIcs() {
-    Files.download("BLENDER_Calendar_v1.ics", Files.makeIcs(Cal, S.plan, C, S.settings, new Date(), S.createdAt), "text/calendar;charset=utf-8");
-    toast("Calendar file downloaded. Open it on your phone to add the lessons.");
+  async function downloadIcs() {
+    const how = await Files.saveFile("BLENDER_Calendar_v1.ics", Files.makeIcs(Cal, S.plan, C, S.settings, new Date(), S.createdAt), "text/calendar;charset=utf-8");
+    if (how === "cancelled") return;
+    toast(how === "shared" ? "Calendar file shared. Open it to add the lessons to your calendar." : "Calendar file downloaded. Open it on your phone to add the lessons.");
   }
 
   /* ---------- More (on phones) ---------- */
 
-  function renderMore() {
+  /* "Me": Progress, My work, Certificate and Settings (on a laptop they are also in the left menu). */
+  function renderMe() {
     const st = certStatus();
-    const row = (href, title, text) => `<li><a class="more-link" href="${href}"><span class="more-title">${title}</span><span class="small muted">${text}</span></a></li>`;
-    main.innerHTML = screenHead("More", "", "") + `<ul class="more-list enter">
-      ${row("#/progress", "Progress", `${doneCount()} of ${COUNT} lessons done, badges, this week`)}
-      ${row("#/work", "My work", "Your screenshots and renders")}
-      ${row("#/certificate", "Certificate", st.ready ? "Ready to print" : "What is still missing")}
-      ${row("#/settings", "Settings", "Your course, days off, look, backup, phone calendar")}
+    const icon = (tab) => { const svg = tabs.querySelector(`[data-tab="${tab}"] .tab-icon`); return svg ? svg.outerHTML.replace(' class="tab-icon"', "") : ""; };
+    const row = (tab, title, text) => `<li><a class="more-link" href="#/${tab}">${icon(tab)}<span class="more-title">${title}</span><span class="small muted">${text}</span></a></li>`;
+    main.innerHTML = screenHead("Me", "", "") + `<ul class="more-list enter">
+      ${row("progress", "Progress", `${doneCount()} of ${COUNT} lessons done, badges, this week`)}
+      ${row("work", "My work", "Your screenshots and renders")}
+      ${row("certificate", "Certificate", st.ready ? "Ready to print" : "What is still missing")}
+      ${row("settings", "Settings", "Your course, days off, look, backup, phone calendar")}
     </ul>`;
   }
 
@@ -1480,6 +1694,7 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", getComputedStyle(document.documentElement).getPropertyValue("--surface-primary").trim());
     colourFavicon();
+    if (window.CourseScene) window.CourseScene.theme();
   }
 
   /* ---------- Moving between screens ---------- */
@@ -1490,17 +1705,63 @@
 
   function setNav(active) {
     tabs.hidden = !S;
-    const inMore = ["progress", "work", "certificate", "settings", "more"].includes(active);
+    const inMe = ["progress", "work", "certificate", "settings", "me"].includes(active);
     tabs.querySelectorAll(".tab").forEach((a) => {
-      const on = a.dataset.tab === active || (a.dataset.tab === "more" && inMore);
+      const on = a.dataset.tab === active || (a.dataset.tab === "me" && inMe);
       if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
-    /* The top bar on a phone has room for the first name only; the full name shows on laptops and stays in the course. */
+    /* The top bar and the laptop menu show the first name only; the full name stays in the course and on the certificate. */
     const full = S ? S.learner.name.trim() : "";
     const cut = full.search(/\s/);
-    const first = cut > 0 ? full.slice(0, cut) : full, rest = cut > 0 ? full.slice(cut) : "";
-    nameEl.innerHTML = full ? `<span class="name-first">${esc(first)}</span><span class="name-rest">${esc(rest)}</span>` : "";
+    nameEl.textContent = cut > 0 ? full.slice(0, cut) : full;
     nameEl.title = full;
+    placePill();
+  }
+
+  /* The soft orange pill behind the active tab. It springs across when you switch tabs;
+     with reduced motion it simply appears in its new place. */
+  const pill = document.getElementById("tab-pill");
+  const laptopMenu = window.matchMedia("(min-width: 960px)");
+  let pillShown = false;
+  function placePill() {
+    if (!pill || tabs.hidden) return;
+    const on = Array.from(tabs.querySelectorAll('.tab[aria-current="page"]')).find((a) => a.offsetParent !== null);
+    if (!on) { pill.classList.remove("is-on", "is-moving"); pillShown = false; return; }
+    const box = tabs.getBoundingClientRect();
+    let w = "", h = "", x, y;
+    if (laptopMenu.matches) {
+      const r = on.getBoundingClientRect();
+      w = r.width + "px"; h = r.height + "px"; x = r.left - box.left; y = r.top - box.top;
+    } else {
+      const r = on.querySelector(".tab-icon").getBoundingClientRect(), css = getComputedStyle(document.documentElement);
+      const pw = parseFloat(css.getPropertyValue("--pill-w")) || 52, ph = parseFloat(css.getPropertyValue("--pill-h")) || 28;
+      x = r.left - box.left + (r.width - pw) / 2; y = r.top - box.top + (r.height - ph) / 2;
+    }
+    pill.classList.toggle("is-moving", pillShown && !reduceMotion.matches);
+    pill.style.width = w; pill.style.height = h;
+    pill.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    pill.classList.add("is-on");
+    pillShown = true;
+  }
+  window.addEventListener("resize", () => { pillShown = false; placePill(); });
+  if (document.fonts) document.fonts.ready.then(() => { pillShown = false; placePill(); });
+
+  /* The 3D world behind the page follows you: the tabs pan, the Map looks from the top, a lesson moves in. */
+  function sceneFollow(page) {
+    const SC = window.CourseScene;
+    if (!SC) return;
+    if (page === "map") {
+      SC.setLessons(LESSONS.map((l) => ({ n: l.number, week: l.week })));
+    }
+    SC.go(page);
+  }
+
+  /* Cards come in one after another, 40 ms apart, when you arrive on a screen. */
+  let shownHash = null;
+  function staggerCards() {
+    const fresh = shownHash !== location.hash;
+    shownHash = location.hash;
+    main.querySelectorAll(".enter").forEach((el, i) => { el.style.animationDelay = fresh ? Math.min(i, 8) * 40 + "ms" : ""; });
   }
 
   function route() {
@@ -1510,7 +1771,9 @@
     renderToken++;
     freeUrls();
     if (window.CourseVisuals) window.CourseVisuals.unmountAll();
-    if (!S) { setNav(null); renderSetup(); return; }
+    if (badgeIO) { badgeIO.disconnect(); badgeIO = null; }
+    dropPweza();
+    if (!S) { setNav(null); renderSetup(); placePweza(); sceneFollow("setup"); staggerCards(); return; }
     switch (page) {
       case "today": renderToday(); setNav("today"); break;
       case "calendar": renderCalendar(parts[1] === "list"); setNav("calendar"); break;
@@ -1521,34 +1784,61 @@
       case "work": renderWork(); setNav("work"); break;
       case "certificate": renderCertificate(); setNav("certificate"); break;
       case "settings": renderSettings(); setNav("settings"); break;
-      case "more": renderMore(); setNav("more"); break;
+      case "me": renderMe(); setNav("me"); break;
+      case "more": location.replace("#/me"); return; /* the old name for "Me" */
       default: location.replace("#/today"); return;
     }
     mountPictures();
+    placePweza();
     if (S.timer && S.timer.lesson) lastPhase = timerInfo(Date.now()).index;
     if (!Store.canSave()) {
       main.insertAdjacentHTML("afterbegin", noticeHtml("<p>This browser won't let the app save, so your progress will be lost when you close it. Try another browser, or leave private browsing.</p>"));
     }
+    sceneFollow(page);
+    staggerCards();
   }
 
+  /* A calendar tile grows into the lesson sheet. Where the browser can't do that, the sheet simply fades in. */
+  let morphFrom = null;
+  main.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#/lesson/"]');
+    morphFrom = a && currentPage() === "calendar" ? { el: a, at: Date.now() } : null;
+  }, true);
+
   window.addEventListener("hashchange", () => {
-    route();
-    window.scrollTo(0, 0);
-    if (location.hash.indexOf("#/map") !== 0) main.focus({ preventScroll: true });
+    const show = () => {
+      route();
+      window.scrollTo(0, 0);
+      if (location.hash.indexOf("#/map") !== 0) main.focus({ preventScroll: true });
+    };
+    const src = morphFrom && Date.now() - morphFrom.at < 1500 && morphFrom.el.isConnected ? morphFrom.el : null;
+    morphFrom = null;
+    if (!src || !document.startViewTransition || reduceMotion.matches || location.hash.indexOf("#/lesson/") !== 0) { show(); return; }
+    src.style.viewTransitionName = "lesson-morph";
+    let card = null;
+    const vt = document.startViewTransition(() => {
+      src.style.viewTransitionName = "";
+      show();
+      card = main.querySelector(".card--hero");
+      if (card) { card.style.viewTransitionName = "lesson-morph"; card.classList.add("is-morph"); }
+    });
+    const tidy = () => { if (card) card.style.viewTransitionName = ""; };
+    vt.ready.catch(() => {});
+    vt.finished.then(tidy, tidy);
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 
   /* The octopus as the tab icon: white on the app's dark colour. The original file is not changed. */
+  /* The browser tab icon: the orange octopus on pitch black, drawn exactly like the home-screen icons
+     (same size and place), in both looks. Zedlab_octopus_logo.svg itself is not changed: the header uses it. */
   function colourFavicon() {
-    const css = getComputedStyle(document.documentElement);
-    const dark = css.getPropertyValue("--surface-primary").trim() || "black";
-    const light = css.getPropertyValue("--label-primary").trim() || "white";
+    const black = "#000000", orange = "#F08A24", scale = 0.78, at = (1920 * (1 - scale)) / 2;
     fetch("Zedlab_octopus_logo.svg").then((r) => (r.ok ? r.text() : Promise.reject())).then((svg) => {
       const inner = svg.replace(/<\?xml[^>]*>/, "").replace(/<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
-      const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1920"><rect width="1920" height="1920" rx="420" fill="${dark}"/>` +
-        `<g fill="${light}" transform="translate(192 192) scale(0.8)">${inner}</g></svg>`;
+      const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1920"><rect width="1920" height="1920" rx="420" fill="${black}"/>` +
+        `<g fill="${orange}" transform="translate(${at} ${at - 40 * scale}) scale(${scale})">${inner}</g></svg>`;
       document.getElementById("favicon").href = "data:image/svg+xml," + encodeURIComponent(icon);
-    }).catch(() => { /* keep the plain file */ });
+    }).catch(() => { /* keep the 192 px icon */ });
   }
 
   /* ---------- Works offline; says when a new version is ready ---------- */
@@ -1590,4 +1880,16 @@
   applyTheme();
   route();
   ticker = setInterval(tick, 1000);
+  (function handOver() {
+    const pl = document.getElementById("preloader");
+    const intro = () => { if (window.CourseScene) window.CourseScene.intro(); };
+    if (!pl) { intro(); return; }
+    const first = document.documentElement.classList.contains("pl-first");
+    setTimeout(() => {
+      pl.classList.add("is-gone");
+      intro();
+      try { localStorage.setItem("zedlabBlenderCourse.intro", "1"); } catch (e) { /* plays again next time */ }
+      setTimeout(() => pl.remove(), 320);
+    }, first ? Math.max(0, 1500 - performance.now()) : 0);
+  })();
 })();

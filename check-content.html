@@ -217,6 +217,23 @@
   })();
 
   (function () {
+    /* The app's own code and pages go online too, so the same private words must never be in them either. */
+    var escapeRe = function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); };
+    var files = ["index.html", "sw.js", "manifest.webmanifest", "README.md", "app/app.js", "app/calendar.js", "app/files.js", "app/pweza.js",
+      "app/scene.js", "app/store.js", "app/styles.css", "app/visuals.js", "check-pweza.html", "check-visuals.html", "check-calendar.html", "tools/make-preloader.js"];
+    var words = (window.PRIVATE_WORDS || []).filter(Boolean), p = [], read = 0;
+    files.forEach(function (f) {
+      var x = new XMLHttpRequest();
+      try { x.open("GET", f, false); x.send(); } catch (e) { p.push(f + " could not be read"); return; }
+      if (x.status !== 200) { p.push(f + " could not be read"); return; }
+      read++;
+      words.forEach(function (w) { if (new RegExp("\\b" + escapeRe(w) + "\\b", "i").test(x.responseText)) p.push("a private word in " + f); });
+    });
+    check("No private words in the app's own code and pages either", p,
+      words.length ? "Searched " + read + " code files for the " + words.length + " private words." : "No private-words.js on this computer, so names were not checked.");
+  })();
+
+  (function () {
     var p = [], text = allLessonText();
     (C.shortcuts || []).forEach(function (s) {
       var t = lessonText(s.firstLesson);

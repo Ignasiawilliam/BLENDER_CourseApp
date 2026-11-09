@@ -30,13 +30,15 @@ When a new version is published, the app shows **"New version ready, tap to upda
 |---|---|
 | `index.html` | The app itself. |
 | `content/` | **The lesson words.** These are the files to edit when a lesson changes. |
-| `app/` | How the app works: screens, dates, saving, backup, pictures, look. |
+| `app/` | How the app works: screens, dates, saving, backup, pictures, look, Pweza the teacher (`app/pweza.js`), and the 3D world behind every screen, like a Blender viewport (`app/scene.js`). |
 | `img/pictures/` | A still image of each lesson's picture, and a small one for the calendar. |
-| `icons/` | The octopus icon for phone home screens. |
-| `fonts/` | The Inter font (free), so the app works offline. |
-| `vendor/three/` | three.js (free), which draws the 3D pictures. |
+| `icons/` | The app icon for home screens and the browser tab: the orange octopus (#F08A24) on pitch black. |
+| `fonts/` | The Plus Jakarta Sans font (free), so the app works offline. |
+| `vendor/three/` | three.js (free), which draws the 3D pictures and the 3D world behind the screens. |
+| `vendor/lucide/` | The licence for the Lucide icons used in the tabs. |
 | `sw.js`, `manifest.webmanifest` | Let the app work offline and go on a home screen. |
-| `check-content.html`, `check-calendar.html`, `check-visuals.html` | **Check pages**: they test the lesson words, the dates and the pictures. |
+| `check-content.html`, `check-calendar.html`, `check-visuals.html`, `check-pweza.html` | **Check pages**: they test the lesson words, the dates, the pictures and Pweza (every mood, with a slow-motion button). |
+| `tools/make-preloader.js` | Writes Pweza's opening into `index.html`. Only needed if his drawing changes: run `node tools/make-preloader.js`. |
 | `Zedlab_logo.svg`, `Zedlab_octopus_logo.svg` | The Zedlab logos, unchanged. The app colours them itself. |
 
 These stay on this computer and are **never published** (the `.gitignore` file makes sure): `BLENDER_Timetable_v*.md`, `BLENDER_AppBrief_v*.md` and `private-words.js`. They hold personal details.
@@ -82,6 +84,7 @@ After changing something:
 4. Wait about a minute. Everyone who opens the app sees "New version ready, tap to update".
 
 If you add a brand-new file the app needs, also add its name to the list at the top of `sw.js`, so it works offline.
+For a bigger change, also change the `VERSION` line at the top of `sw.js` (any new words will do): phones then fetch every file fresh.
 
 ---
 
@@ -115,6 +118,7 @@ To move a course to a new phone: download a backup, send the file to yourself, o
 
 ## Free tools used
 
-- **Inter** font, SIL Open Font License (`fonts/Inter-LICENSE.txt`).
+- **Plus Jakarta Sans** font, SIL Open Font License (`fonts/PlusJakartaSans-LICENSE.txt`).
+- **Lucide** icons for the tabs and menu, ISC licence (`vendor/lucide/LICENSE`).
 - **three.js** 0.187.0, MIT licence (`vendor/three/LICENSE`).
 - Blender is a trademark of the Blender Foundation. This app is made by Zedlab and is not affiliated with the Blender Foundation.

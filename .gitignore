@@ -1,6 +1,7 @@
 # Files that must never be published (they hold personal details)
 BLENDER_AppBrief_v*.md
 BLENDER_Timetable_v*.md
+BLENDER_DesignUpdate_v*.md
 private-words.js
 
 # Blender files, backups and calendar files, if any end up in this folder

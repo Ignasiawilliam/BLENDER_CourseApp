@@ -116,6 +116,24 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  /* On a phone or tablet that can share files, open its share sheet (Save to Files, Mail, WhatsApp...) with the file.
+     Anywhere else, or if sharing is not possible right now, download it as before. The file name is the same either way.
+     Answers "shared", "downloaded" or "cancelled" (the share sheet was closed without choosing). */
+  async function saveFile(name, content, type) {
+    const blob = content instanceof Blob ? content : new Blob([content], { type: type || "application/octet-stream" });
+    const touch = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+    if (touch && navigator.share && navigator.canShare && typeof File === "function") {
+      let file = null, can = false;
+      try { file = new File([blob], name, { type: blob.type }); can = navigator.canShare({ files: [file] }); } catch (e) { can = false; }
+      if (can) {
+        try { await navigator.share({ files: [file], title: name }); return "shared"; }
+        catch (e) { if (e && e.name === "AbortError") return "cancelled"; /* not allowed just now: download instead */ }
+      }
+    }
+    download(name, blob, type);
+    return "downloaded";
+  }
+
   function pickFile(accept) {
     return new Promise((resolve) => {
       const input = document.createElement("input");
@@ -171,5 +189,5 @@
     });
   }
 
-  root.CourseFiles = { backupFileName, makeBackup, parseBackup, makeIcs, download, pickFile, readText, blobToDataUrl, dataUrlToBlob, shrinkImage };
+  root.CourseFiles = { backupFileName, makeBackup, parseBackup, makeIcs, download, saveFile, pickFile, readText, blobToDataUrl, dataUrlToBlob, shrinkImage };
 })(typeof window !== "undefined" ? window : this);
