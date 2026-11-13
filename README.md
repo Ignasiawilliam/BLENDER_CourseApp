@@ -15,8 +15,8 @@ Made by Zedlab. Not affiliated with the Blender Foundation.
 1. **Open the link** on a phone or a laptop.
 2. **Set up your course** (under a minute): your name for the certificate, the start date, your lesson days and time, and any days off. 9 December, Independence Day, is a day off already.
 3. **Today** shows the lesson for today, with a countdown to lesson time. Press **Start lesson timer** to be guided through the five parts of the lesson.
-4. When you finish, press **I did it**. If a day doesn't work, press **Can't today, move it**: that lesson and every later one move along by one lesson day. Nothing is squeezed or skipped.
-5. **Copy message for my tutor** copies a line like "Start today's lesson: Week 1, day 3, Select, move, rotate, scale." to paste into your chat.
+4. When you finish, press **I did it**. If a day doesn't work, press **Can't today**: that lesson and every later one move along by one lesson day. Nothing is squeezed or skipped.
+5. **Copy message for my tutor** (lower down on Today) copies a line like "Start today's lesson: Week 1, day 3, Select, move, rotate, scale." to paste into your chat.
 6. Every Friday, download a **backup** (Settings, or the reminder on Today). Keep the file somewhere safe, such as your email.
 7. **Put it on your home screen** (Settings explains how). After the first visit it works without internet.
 
@@ -37,11 +37,27 @@ When a new version is published, the app shows **"New version ready, tap to upda
 | `vendor/three/` | three.js (free), which draws the 3D pictures and the 3D world behind the screens. |
 | `vendor/lucide/` | The licence for the Lucide icons used in the tabs. |
 | `sw.js`, `manifest.webmanifest` | Let the app work offline and go on a home screen. |
-| `check-content.html`, `check-calendar.html`, `check-visuals.html`, `check-pweza.html` | **Check pages**: they test the lesson words, the dates, the pictures and Pweza (every mood, with a slow-motion button). |
+| `check-content.html`, `check-calendar.html`, `check-visuals.html`, `check-pweza.html` | **Check pages**: they test the lesson words, the dates, the pictures and Pweza (every mood and the opening, with a slow-motion button). |
 | `tools/make-preloader.js` | Writes Pweza's opening into `index.html`. Only needed if his drawing changes: run `node tools/make-preloader.js`. |
 | `Zedlab_logo.svg`, `Zedlab_octopus_logo.svg` | The Zedlab logos, unchanged. The app colours them itself. |
 
 These stay on this computer and are **never published** (the `.gitignore` file makes sure): `BLENDER_Timetable_v*.md`, `BLENDER_AppBrief_v*.md` and `private-words.js`. They hold personal details.
+
+---
+
+## The look, in three rules
+
+These keep the app calm and easy to read. Please keep them when changing anything.
+
+1. **Layers, not flat.** Today and every lesson open with a hero in three layers: the lesson number, huge and faint, at the back; the lesson's 3D picture floating in the middle with no box; the words and the one button in front, on a soft black fade so no line of the 3D world shows behind them. Scrolling moves the number at half speed and the picture at three-quarter speed (not with Reduce motion). The Map has each week's number at the back in the same way.
+2. **Orange means "tap this".** Orange (#F08A24) is only for the one filled button on a screen, the next lesson on the Map, today in the Calendar, focus rings, Pweza's glasses and the key highlights inside lesson pictures. Everything else is white and greys. The week colours are only in the Calendar and on the Map. Red is only for error messages and the Reset button.
+3. **Three text sizes.** Huge (Plus Jakarta Sans 800, 34 to 40 px), exactly one per screen: the lesson title on Today (the timer's digits while it runs), the month in the Calendar, "Course map", "Toolbox", the percent on Me, the name on the certificate, and each other screen's title. Normal (15 px) for everything you read. Small (11 px) for labels in capitals, captions and the phone's tab labels. The only font is Plus Jakarta Sans.
+
+**Calm.** Black page, cards #0D0D0D, raised things (buttons, fields, chips, keys) #161616, and no borders or lines. Text is white, with #8A8A8A for anything secondary. Phones have 20 px side margins; on a laptop the content is at most 880 px wide. Every Huge line has 32 px above it (above its small label, when it has one) and 12 px below. Buttons are 48 px tall with 14 px corners; the one orange button per screen is the only filled colour, the others are white words on #161616. Movement takes 320 to 450 ms and slows gently to a stop; the tab pill and the 3D camera still spring, with only a touch of overshoot. The opening (Pweza's preloader) is the one exception to this movement rule: it is slower on purpose, so you can see what it is.
+
+**The opening, every time.** Every time the app opens, Pweza's opening plays: he drops in (0.9 s, with a small bounce), "BLENDER COURSE" fades in, he blinks and waves, and a thin orange line fills. It stays until his wave has finished, about 1.8 s, even when the app is ready sooner, then fades out over 0.5 s. If the app is ever not ready, it leaves by itself at 4 s. The moment the app goes to the background, the same screen goes up again, still, so the phone's app switcher shows Pweza and coming back never flashes the old screen. Coming back from another app plays it again for the same 1.8 s (Pweza is already there, so without the drop). A tap anywhere (or any key) skips it, and that tap never presses anything underneath. It never pauses or resets the lesson timer, which follows the real clock. With Reduce motion there is no drop and no wave: Pweza and the title show still for 1 s, then fade over 0.5 s. Try both on `check-pweza.html`.
+
+**Depth, kept subtle.** The top bar and tab bar are frosted glass (black at 70%, blurred), so the screen slides softly underneath; Pweza's speech bubble and the two chips on Today are dark glass too, and a big moment blurs what is behind it. At most three glass surfaces show at once (the bars first); the rest show the same colour, solid. Glass turns solid with Reduce motion, Reduce transparency, or where the browser can't blur. The only glows: a soft orange one under the orange button, the same on the Map's next lesson, and a faint white halo behind the floating 3D model. Buttons and cards have a soft white highlight along their top edge. While you scroll, the 3D picture holds still for a moment, so scrolling stays smooth on a phone.
 
 ---
 
@@ -53,7 +69,7 @@ All the words live in the `content` folder. Open a file in **Notepad** (right-cl
 - `content/glossary.js`: the Blender words and what they mean.
 - `content/shortcuts.js`: the keys for the cheat sheet. Write keys exactly as the lessons do.
 - `content/standard.js`: the 9 points of the final project standard.
-- `content/visuals.js`: the caption under each lesson's picture (`caption`).
+- `content/visuals.js`: the words that describe each lesson's picture (`caption`). Screen readers read them out; on Today and on a lesson the picture floats with no caption under it.
 
 **The rules:**
 

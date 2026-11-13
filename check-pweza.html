@@ -15,50 +15,53 @@
   .gal-checks li { display: grid; grid-template-columns: var(--space-24) 1fr; gap: var(--space-8); background: var(--surface-secondary); border: var(--line) solid var(--card-edge); border-radius: var(--radius-md); padding: var(--space-12) var(--space-16); }
   .gal-checks .ok { color: var(--success); font-weight: 800; }
   .gal-checks .bad { color: var(--error); font-weight: 800; }
-  .gal-checks .detail { color: var(--label-secondary); font-size: var(--text-footnote); }
-  .gal h2 { font-size: var(--text-title2); font-weight: 800; margin: var(--space-32) 0 var(--space-4); }
+  .gal-checks .detail { color: var(--label-secondary); font-size: var(--text-small); }
+  .gal h2 { font-size: var(--text-normal); font-weight: 800; margin: var(--space-32) 0 var(--space-4); }
   .gal h2 + p { color: var(--label-secondary); margin-bottom: var(--space-16); }
   .moods { display: grid; gap: var(--space-12); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
   .mood { display: grid; align-content: start; justify-items: center; gap: var(--space-8); padding: var(--space-16) var(--space-16) var(--space-20);
     background: var(--surface-secondary); border: var(--line) solid var(--card-edge); border-radius: var(--radius-lg); text-align: center; }
   .mood .overline { justify-content: center; }
-  .mood h3 { font-size: var(--text-subheadline); font-weight: 600; color: var(--label-secondary); line-height: 1.35; min-height: 2.7em; }
+  .mood h3 { font-size: var(--text-normal); font-weight: 600; color: var(--label-secondary); line-height: 1.35; min-height: 2.7em; }
   .mood .pz { margin-top: var(--space-24); }
   .row-demo { display: grid; gap: var(--space-12); }
   .row-demo .card { padding: var(--space-16); }
   .match { display: flex; flex-wrap: wrap; gap: var(--space-24); align-items: center; }
-  .match figure { margin: 0; display: grid; gap: var(--space-8); justify-items: center; font-size: var(--text-footnote); color: var(--label-secondary); }
+  .match figure { margin: 0; display: grid; gap: var(--space-8); justify-items: center; font-size: var(--text-small); color: var(--label-secondary); }
   .match .stack { position: relative; width: 200px; height: 200px; }
   .match .stack > * { position: absolute; inset: 0; width: 100%; height: 100%; }
   .match .logo-line { fill: none; stroke: var(--accent); stroke-width: 14; }
   .props { display: grid; gap: var(--space-8); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); list-style: none; }
-  .props li { display: flex; justify-content: space-between; gap: var(--space-8); padding: var(--space-12) var(--space-16); background: var(--surface-secondary); border: var(--line) solid var(--card-edge); border-radius: var(--radius-md); font-size: var(--text-subheadline); }
+  .props li { display: flex; justify-content: space-between; gap: var(--space-8); padding: var(--space-12) var(--space-16); background: var(--surface-secondary); border: var(--line) solid var(--card-edge); border-radius: var(--radius-md); font-size: var(--text-normal); }
   .props li span:last-child { color: var(--label-secondary); text-align: right; }
 
-  /* ---------- The preloader (this block moves into index.html in step 2) ---------- */
-  .pl { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: #000000; transition: opacity 280ms ease; }
+  /* ---------- The opening (the same as in index.html): an open, and a return from another app ---------- */
+  .pl { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: #000000; transition: opacity 500ms ease-in-out; }
   .pl.is-gone { opacity: 0; pointer-events: none; }
   .pl-inner { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-  .pl-fig { width: 140px; height: 140px; animation: pl-drop 650ms cubic-bezier(0.3, 1.45, 0.55, 1) both; }
+  .pl-fig { width: 140px; height: 140px; animation: pl-drop 900ms cubic-bezier(0.3, 1.45, 0.55, 1) both; }
   .pl .pz-svg { display: block; width: 100%; height: 100%; overflow: visible; }
   .pl .pz-svg g { transform-box: view-box; }
   .pl { --pz-body: #FFFFFF; --pz-ink: #000000; --pz-gap: #000000; --pz-glass: #F08A24; }
   .pl-arm-still { display: none; }
-  .pl .pz-eyes { animation: pl-blink 200ms ease-in-out 820ms both; }
+  .pl .pz-eyes { animation: pl-blink 200ms ease-in-out 1070ms both; }
   .pl-title { margin: 0; color: #FFFFFF; font: 700 13px/1 "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    letter-spacing: 0.08em; text-transform: uppercase; animation: pl-fade 450ms ease 420ms both; }
+    letter-spacing: 0.08em; text-transform: uppercase; animation: pl-fade 450ms ease 670ms both; }
   .pl-line { width: 120px; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
-  .pl-line i { display: block; height: 100%; background: #F08A24; transform-origin: left center; animation: pl-load var(--pl-time, 1.5s) linear both; }
+  .pl-line i { display: block; height: 100%; background: #F08A24; transform-origin: left center; animation: pl-load var(--pl-time, 1.8s) linear both; }
   @keyframes pl-drop { from { transform: translateY(-90px); opacity: 0; } 35% { opacity: 1; } to { transform: none; opacity: 1; } }
   @keyframes pl-blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.08); } }
   @keyframes pl-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes pl-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @media (prefers-reduced-motion: reduce) {
     .pl-fig, .pl .pz-eyes, .pl-title, .pl-line i { animation: none !important; }
+    .pl-line { visibility: hidden; }
     .pl-arm-anim { display: none; } .pl-arm-still { display: inline; }
   }
   .pl.is-still .pl-fig, .pl.is-still .pz-eyes, .pl.is-still .pl-title, .pl.is-still .pl-line i { animation: none !important; }
-  .pl.is-still .pl-arm-anim { display: none; } .pl.is-still .pl-arm-still { display: inline; }
+  .pl.is-still .pl-arm-anim { display: none; } .pl.is-still .pl-arm-still { display: inline; } .pl.is-still .pl-line { visibility: hidden; }
+  /* a return from another app: the same 1.8 s, with Pweza and the words already there */
+  .pl.is-back .pl-fig, .pl.is-back .pl-title { animation: none; }
 </style>
 </head>
 <body>
@@ -70,8 +73,8 @@
     <button type="button" class="btn btn--small" id="still" aria-pressed="false">Show still poses (reduce motion)</button>
     <button type="button" class="btn btn--small" id="slow" aria-pressed="false">Slow motion (quarter speed)</button>
     <button type="button" class="btn btn--small" id="light" aria-pressed="false">Light look</button>
-    <button type="button" class="btn btn--small btn--primary" id="pl-intro">Play the first-open intro (1.5 s)</button>
-    <button type="button" class="btn btn--small" id="pl-later">Play a later open (0.6 s)</button>
+    <button type="button" class="btn btn--small btn--primary" id="pl-intro">Play the opening (1.8 s)</button>
+    <button type="button" class="btn btn--small" id="pl-back">Play a return from another app (1.8 s)</button>
   </div>
   <ul class="gal-checks" id="checks"></ul>
 </header>
@@ -170,14 +173,16 @@
   const pl = document.getElementById("pl");
   document.getElementById("pl-fig").innerHTML = P.preloaderMarkup();
   let plCur = pl, plRaf = 0;
-  function playPreloader(ms) {
+  function playPreloader(ms, kind) {
     const rate = P.getTimeScale();
+    if (stillBtn.getAttribute("aria-pressed") === "true" || matchMedia("(prefers-reduced-motion: reduce)").matches) ms = 1000; /* still: 1 s */
     const clone = plCur.cloneNode(true); /* a fresh copy restarts every animation */
     plCur.replaceWith(clone); plCur = clone; window.__pl = clone;
     clone.hidden = false;
     clone.style.setProperty("--pl-time", ms + "ms");
     clone.classList.toggle("is-still", stillBtn.getAttribute("aria-pressed") === "true");
     clone.classList.remove("is-gone");
+    clone.classList.toggle("is-back", kind === "back");
     const svg = clone.querySelector("svg");
     clone.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = rate; });
     cancelAnimationFrame(plRaf);
@@ -189,10 +194,10 @@
         plRaf = requestAnimationFrame(tick);
       } else svg.unpauseAnimations();
     }
-    setTimeout(() => { clone.classList.add("is-gone"); setTimeout(() => { clone.hidden = true; }, 300); }, ms / rate);
+    setTimeout(() => { clone.classList.add("is-gone"); setTimeout(() => { clone.hidden = true; }, 540); }, ms / rate);
   }
-  document.getElementById("pl-intro").addEventListener("click", () => playPreloader(1500));
-  document.getElementById("pl-later").addEventListener("click", () => playPreloader(600));
+  document.getElementById("pl-intro").addEventListener("click", () => playPreloader(1800, "open"));
+  document.getElementById("pl-back").addEventListener("click", () => playPreloader(1800, "back"));
 
   /* Checks */
   function runChecks() {

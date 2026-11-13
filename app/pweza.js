@@ -566,7 +566,7 @@
   function preloaderMarkup() {
     const frames = preloaderFrames();
     const values = frames.map((g) => g.d).join(";");
-    const anim = `<path class="pz-arm pl-arm-anim" d="${frames[0].d}" fill="var(--pz-body)"><animate attributeName="d" begin="0.38s" dur="1.1s" fill="freeze" calcMode="linear" values="${values}"/></path>`;
+    const anim = `<path class="pz-arm pl-arm-anim" d="${frames[0].d}" fill="var(--pz-body)"><animate attributeName="d" begin="0.63s" dur="1.1s" fill="freeze" calcMode="linear" values="${values}"/></path>`;
     const stillArm = `<path class="pz-arm pl-arm-still" d="${frames[0].d}" fill="var(--pz-body)"/>`;
     return markup("pl-svg", true).replace(/<path class="pz-arm pz-armR" d="[^"]*" fill="var\(--pz-body\)"\/>/, anim + stillArm);
   }

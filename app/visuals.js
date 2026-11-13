@@ -6,6 +6,8 @@
   - Only one picture moves at a time: the one most in view. The others show a still frame.
   - Pictures pause when off screen. With "reduce motion" switched on, every picture is a still.
   - If the device cannot show 3D, a flat still drawing is shown instead.
+  - In a hero (Today, a lesson) the picture is drawn see-through, with no background, no floor grid and no box,
+    so it floats on the 3D world behind the page. Without 3D it shows the saved picture in its box.
   - 3D uses three.js (vendor/three), loaded only when a picture first comes near the screen.
 */
 (function () {
@@ -94,7 +96,8 @@
   }
 
   function makeRenderer() {
-    const r = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "low-power" });
+    /* see-through, for the hero pictures; the others paint their own background */
+    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); /* sharp enough, and keeps phones cool */
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.VSMShadowMap;
@@ -112,7 +115,7 @@
     const lesson = lessonFor(lessonNumber);
     const week = lessonNumber === 0 ? 0 : lesson.week;
     const fig = document.createElement("figure");
-    fig.className = "vis" + (opts.compact ? " vis--compact" : "");
+    fig.className = "vis" + (opts.compact ? " vis--compact" : "") + (opts.hero ? " vis--hero" : "");
     fig.style.setProperty("--wk", week ? `var(--week-${week})` : "var(--accent)");
     fig.innerHTML = `<div class="vis-stage" aria-hidden="true"><div class="vis-art"></div><div class="vis-overlay"></div>
         <div class="vis-keys">${spec.chips.map((c, i) => `<span class="vis-chip" data-i="${i}">${chipHtml(c.keys)}</span>`).join("")}</div></div>
@@ -123,12 +126,16 @@
       fig, spec, lessonNumber, lesson, week,
       stage: fig.querySelector(".vis-stage"), art: fig.querySelector(".vis-art"), overlay: fig.querySelector(".vis-overlay"),
       chips: Array.from(fig.querySelectorAll(".vis-chip")),
-      kind: FLAT[spec.scene] ? "flat" : "solid", ratio: 0, near: false, flat: null, live: null, stillDone: false, t0: 0
+      kind: FLAT[spec.scene] ? "flat" : "solid", ratio: 0, near: false, flat: null, live: null, stillDone: false, t0: 0,
+      hero: !!opts.hero, boxed: false
     };
     items.add(item);
     if (item.kind === "flat") {
       item.flat = FLAT[spec.scene](item.art, makeFlatCtx(item));
       showPoster(item);
+    } else if (item.hero) {
+      /* no saved picture (it has a background): it plays live, or a see-through still is made here */
+      item.premade = false;
     } else {
       showSavedStill(item);
     }
@@ -185,6 +192,8 @@
 
   /* Last resort: a simple drawing in the week's colour. */
   function showFallback(item) {
+    /* a hero picture without 3D: the saved picture, in its box */
+    if (item.hero && !item.boxed) { item.boxed = true; item.fig.classList.add("is-boxed"); showSavedStill(item); return; }
     if (item.premade !== false) { showSavedStill(item); return; }
     item.art.innerHTML = `<div class="vis-fallback"><span class="vis-fallback-n">${item.lessonNumber}</span></div>`;
     item.overlay.innerHTML = "";
@@ -197,7 +206,9 @@
       const item = Array.from(items).find((it) => it.fig === e.target);
       if (!item) return;
       item.near = e.isIntersecting;
-      if (item.near && item.kind === "solid" && !item.stillDone) queueStill(item);
+      /* A hero picture that is about to play needs no still: one is made only if it stops, or cannot play */
+      const willPlay = item.hero && !forceStill && !forceFlat && !reduceMQ.matches && !document.hidden && glSupported();
+      if (item.near && item.kind === "solid" && !item.stillDone && !willPlay) queueStill(item);
     });
   }
 
@@ -252,6 +263,7 @@
     cancelAnimationFrame(raf);
     if (!item) return;
     item.fig.classList.remove("is-playing");
+    item.drawn = false;
     if (item.kind === "solid") {
       if (item.live) { disposeScene(item.live); item.live = null; }
       if (liveRenderer && liveRenderer.domElement.parentNode === item.art) item.art.removeChild(liveRenderer.domElement);
@@ -263,9 +275,15 @@
     }
   }
 
+  /* While the page is being scrolled, the playing picture holds its last frame, so on a phone its drawing never
+     competes with the scroll. It carries on (at the right point in its loop) as soon as the scrolling stops. */
+  let scrollQuietAt = 0;
+  window.addEventListener("scroll", () => { scrollQuietAt = performance.now() + 150; }, { passive: true });
+
   function frame(now) {
     const item = active;
     if (!item) return;
+    if (now < scrollQuietAt && item.drawn) { raf = requestAnimationFrame(frame); return; }
     const p = (((now - item.t0) / 1000) / item.spec.seconds) % 1;
     if (item.kind === "flat") {
       item.flat.update(p, false);
@@ -274,6 +292,7 @@
       item.live.update(p);
       liveRenderer.render(item.live.scene, item.live.camera);
     }
+    item.drawn = true;
     setChips(item, p, false);
     raf = requestAnimationFrame(frame);
   }
@@ -311,7 +330,7 @@
       live.resize(w, h);
       live.update(item.spec.poster);
       liveRenderer.render(live.scene, live.camera);
-      const url = liveRenderer.domElement.toDataURL("image/jpeg", 0.88);
+      const url = liveRenderer.domElement.toDataURL(item.hero ? "image/png" : "image/jpeg", 0.88);
       const img = new Image();
       img.alt = "";
       img.className = "vis-still";
@@ -388,14 +407,16 @@
     const T = THREE, t = tokens();
     tokenSource = null;
     const scene = new T.Scene();
-    scene.background = new T.Color(t.bg);
-    scene.fog = new T.Fog(new T.Color(t.bg), 11, 22);
+    if (!item.hero) {
+      scene.background = new T.Color(t.bg);
+      scene.fog = new T.Fog(new T.Color(t.bg), 11, 22);
+    }
     const camera = new T.PerspectiveCamera(32, 16 / 9, 0.05, 80);
     camera.position.set(5.2, 3.6, 6.4);
     camera.lookAt(0, 0.7, 0);
     const wk = new T.Color(item.week ? t.weeks[item.week - 1] : t.accent);
     item.overlay.innerHTML = "";
-    const ctx = { T, scene, camera, renderer, t, wk, item, overlay: item.overlay, mode: item.spec.mode, lesson: item.lesson };
+    const ctx = { T, scene, camera, renderer, t, wk, item, hero: !!item.hero, overlay: item.overlay, mode: item.spec.mode, lesson: item.lesson };
     ctx.h = helpers(ctx);
     const scenePart = SOLID[item.spec.scene](ctx);
     const live = {
@@ -428,6 +449,8 @@
     }
 
     function grid(size, step) {
+      /* in a hero the world's own grid shows through instead */
+      if (ctx.hero) { const empty = new T.Group(); ctx.scene.add(empty); return empty; }
       const S = size || 14, st = step || 0.5, n = S / st, pts = [];
       for (let i = -n / 2; i <= n / 2; i++) {
         if (i === 0) continue;
@@ -1009,9 +1032,11 @@
     /* Lesson 13: lights. */
     light(ctx) {
       const { T, h, scene, camera } = ctx;
-      scene.background = h.col(ctx.t.bg);
+      if (!ctx.hero) scene.background = h.col(ctx.t.bg);
       scene.fog = null;
-      const floor = new T.Mesh(new T.PlaneGeometry(30, 30), new T.MeshStandardMaterial({ color: h.col(ctx.t.panel2).multiplyScalar(1.25), roughness: 0.95 }));
+      /* in a hero the floor keeps only its shadow */
+      const floor = new T.Mesh(new T.PlaneGeometry(30, 30), ctx.hero ? new T.ShadowMaterial({ opacity: 0.55 })
+        : new T.MeshStandardMaterial({ color: h.col(ctx.t.panel2).multiplyScalar(1.25), roughness: 0.95 }));
       floor.rotation.x = -Math.PI / 2;
       floor.receiveShadow = true;
       const pod = h.podium(h.col(ctx.t.panel2).multiplyScalar(1.8), 1);
@@ -1306,8 +1331,7 @@
           print.position.set(0, 0.05 + (1 - on) * 1.4, h.SHIRT_FRONT + (1 - on) * 0.5);
           print.scale.setScalar(Math.max(0.0001, on));
           h.orbit(camera, lerp(-0.5, 0.45, move), lerp(9.5, 7.2, move), lerp(2.2, 2.9, move), new T.Vector3(0.1, 0.85, 0));
-          scene.background.copy(bgA).lerp(bgB, bg);
-          scene.fog.color.copy(scene.background);
+          if (scene.background) { scene.background.copy(bgA).lerp(bgB, bg); scene.fog.color.copy(scene.background); }
           label.hidden = true;
         }
       };
@@ -1626,7 +1650,12 @@
       items.forEach((it) => {
         if (it.kind !== "solid") return;
         it.art.innerHTML = "";
-        showSavedStill(it);
+        if (it.hero && !forceFlat) {
+          it.boxed = false; it.fig.classList.remove("is-boxed"); it.premade = false; it.stillDone = false; queueStill(it);
+        } else {
+          if (it.hero) { it.boxed = true; it.fig.classList.add("is-boxed"); }
+          showSavedStill(it);
+        }
       });
       chooseActive();
     },

@@ -29,7 +29,7 @@
 
   const MAX_RATIO = 1.5;          /* sharpness cap */
   const MOVE_MAX = 560;           /* ms: every camera move lands by then (a late frame still keeps it under 0.6 s) */
-  const OMEGA = 14, ZETA = 0.72;  /* the spring: quick, eases out, overshoots a touch */
+  const OMEGA = 14, ZETA = 0.82;  /* the spring: quick, eases out, with only about 1% overshoot (it was about 4%) */
   const FOV = 50;
   /* Sideways distance between two tabs. Small enough that even a long jump never slides the grid more than
      about half a square per frame, so the grid never seems to stand still or run backwards. */

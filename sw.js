@@ -11,7 +11,7 @@
   When you publish a bigger change, also change VERSION: phones then fetch every file fresh,
   and anyone with the app open sees "New version ready, tap to update".
 */
-const VERSION = "2026-11-09 design update (Plus Jakarta Sans, Pweza, 3D viewport, orange icons)";
+const VERSION = "2026-11-12 design update 2 (layers, one orange, three sizes, calmer, opening every time)";
 const CACHE = "zedlab-blender-course";
 
 const FILES = [

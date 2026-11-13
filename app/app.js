@@ -43,7 +43,7 @@
   const todayKey = () => Cal.todayKey();
   const schedule = () => Cal.schedule(S.plan);
   const lessonData = (n) => (n === 0 ? DAY0 : LESSONS[n - 1]);
-  const weekVar = (n) => (n === 0 ? "--wk: var(--accent); --wk-ink: var(--on-accent)" : `--wk: var(--week-${lessonData(n).week})`);
+  const weekVar = (n) => (n === 0 ? "--wk: var(--label-primary); --wk-ink: var(--surface-primary)" : `--wk: var(--week-${lessonData(n).week})`);
   const labelOf = (n) => (n === 0 ? "Before you start" : Cal.lessonLabel(n, WEEKS));
   const isDone = (n) => !!(S && S.done && S.done[n]);
   const kindName = (l) => ({ "week project": "Week project", "final project": "Final project", "certificate day": "Certificate day" }[l.kind] || "");
@@ -248,6 +248,7 @@
       pzWhere = where; pzKey = key;
     }
     hideDuringMoment();
+    glassSoon();
   }
   /* Only one Pweza on screen: while a big moment plays, any other Pweza waits out of sight */
   function hideDuringMoment() {
@@ -271,11 +272,12 @@
     const m = { layer, dim, big, t1: 0, t2: 0 };
     moment = m;
     hideDuringMoment();
+    placeGlass(); /* the backdrop is glass from its first frame */
     requestAnimationFrame(() => { dim.classList.add("is-on"); layer.classList.add("is-on"); });
     m.t1 = setTimeout(() => {
       dim.classList.remove("is-on");
       layer.classList.remove("is-on");
-      m.t2 = setTimeout(() => { big.destroy(); layer.remove(); dim.remove(); if (moment === m) { moment = null; hideDuringMoment(); } }, 320);
+      m.t2 = setTimeout(() => { big.destroy(); layer.remove(); dim.remove(); if (moment === m) { moment = null; hideDuringMoment(); glassSoon(); } }, 320);
     }, 2300);
   }
   /* The certificate unlocks: celebrate once */
@@ -405,24 +407,48 @@
 
   /* ---------- Shared pieces of a lesson ---------- */
 
+  /* The small label above a lesson's title, in grey capitals: WEEK 1 · DAY 4 · TODAY (and WEEK PROJECT, DONE) */
+  const dotted = (parts) => parts.map((p) => `<span>${p}</span>`).join('<span aria-hidden="true">·</span>');
   function overlineHtml(n, s, t) {
-    if (n === 0) return `<p class="overline"><span class="tag tag--week" style="--wk: var(--accent); --wk-ink: var(--on-accent)">Before you start</span><span>${esc(DAY0.length)}</span></p>`;
+    if (n === 0) return `<p class="overline">${dotted(["Before you start", esc(DAY0.length)])}</p>`;
     const l = lessonData(n), date = Cal.dateOf(s, n);
-    return `<p class="overline"><span class="tag tag--week">Week ${l.week}</span><span>Day ${l.day}</span>` +
-      `<span>${date === t ? "Today" : esc(Cal.formatLong(date))}</span>` +
-      (l.kind !== "lesson" ? `<span class="tag tag--project">${esc(kindName(l))}</span>` : "") +
-      (isDone(n) ? '<span class="tag tag--done">Done</span>' : "") + "</p>";
+    const parts = [`Week ${l.week}`, `Day ${l.day}`, date === t ? "Today" : esc(Cal.formatLong(date))];
+    if (l.kind !== "lesson") parts.push(esc(kindName(l)));
+    if (isDone(n)) parts.push("Done");
+    return `<p class="overline"><span class="sr-only">Lesson ${n}.</span>${dotted(parts)}</p>`;
   }
 
-  /* The lesson's picture: app/visuals.js puts the animated picture and its caption here. */
-  function visualHtml(n) {
-    return `<div class="vis-slot" data-vis="${n}"></div>`;
+  /* The lesson's picture: app/visuals.js puts the animated picture here. In a hero it floats, with no box and no caption. */
+  function visualHtml(n, hero) {
+    return `<div class="vis-slot" data-vis="${n}"${hero ? ' data-hero="1"' : ""}></div>`;
+  }
+
+  /* The hero on Today and on a lesson, in three layers: the lesson number at the back, the picture floating
+     in the middle, and the words in front. Without a lesson (a day off, the end) only the front is shown. */
+  function heroShell(n, front, opts) {
+    const o = opts || {}, pic = n != null && o.pic !== false;
+    const art = n == null ? "" : `<div class="hero-art">
+        <span class="back-num hero-num" aria-hidden="true">${pad2(n)}</span>
+        ${pic ? `<div class="hero-pic">${visualHtml(n, true)}</div>` : ""}
+      </div>`;
+    /* The shade is a soft black fade behind the words: see-through by the picture, fully black from the top of the label down,
+       so no line of the 3D world shows behind the words. It sits under the picture, which keeps its 3D world around it. */
+    return `<section class="hero${pic ? " hero--pic" : ""}${o.timing ? " is-timing" : ""} enter" aria-labelledby="${o.id || "hero-title"}">
+      ${art}<div class="hero-front"><div class="hero-shade" aria-hidden="true"></div><div class="hero-words">${front}</div></div></section>`;
+  }
+
+  /* Under the hero: the keys and buttons this lesson brings in, in a quiet card */
+  function keysCardHtml(n) {
+    const list = C.shortcuts.filter((x) => x.firstLesson === n);
+    if (!list.length) return "";
+    return `<section class="card enter" aria-labelledby="keys-title"><h2 class="section-title" id="keys-title">Keys and buttons in this lesson</h2>
+      <ul class="shortcut-list">${list.map((sc) => `<li>${chipsHtml(sc)}<span>${esc(sc.does)}${sc.where ? ` <span class="muted small">${esc(sc.where)}</span>` : ""}</span></li>`).join("")}</ul></section>`;
   }
   const thumb = (n) => (window.CourseVisuals ? window.CourseVisuals.thumbUrl(n) : "");
 
   function mountPictures() {
     if (!window.CourseVisuals) return;
-    main.querySelectorAll("[data-vis]").forEach((el) => window.CourseVisuals.mount(el, +el.dataset.vis));
+    main.querySelectorAll("[data-vis]").forEach((el) => window.CourseVisuals.mount(el, +el.dataset.vis, el.dataset.hero ? { hero: true, caption: false } : undefined));
   }
 
   function chipsHtml(sc) {
@@ -573,63 +599,62 @@
   /* ---------- Today ---------- */
 
   function renderToday() {
-    const t = todayKey(), s = schedule(), out = [];
-    if (flash) { out.push(noticeHtml(`<p>${esc(flash)}</p>`, "kind")); flash = null; }
+    const t = todayKey(), s = schedule(), notes = [];
+    if (flash) { notes.push(noticeHtml(`<p>${esc(flash)}</p>`, "kind")); flash = null; }
     if (S.settings.hasBlender === "not yet") {
-      out.push(noticeHtml(`<p>Install Blender 5.2 LTS before lesson 1. <a href="${esc(C.course.download)}" target="_blank" rel="noopener">Get it from blender.org</a>.</p>
+      notes.push(noticeHtml(`<p>Install Blender 5.2 LTS before lesson 1. <a href="${esc(C.course.download)}" target="_blank" rel="noopener">Get it from blender.org</a>.</p>
         <div class="actions"><button type="button" class="btn btn--small" data-action="have-blender">I have it now</button></div>`));
     }
-    if (s.problem) { out.push(noticeHtml(`<p>${esc(s.problem)}</p>`)); main.innerHTML = out.join(""); return; }
-    out.push(fridayHtml(s, t));
+    if (s.problem) { notes.push(noticeHtml(`<p>${esc(s.problem)}</p>`)); main.innerHTML = notes.join(""); return; }
 
     const first = s.lessons[0].date;
     const behind = s.lessons.find((l) => l.date < t && !isDone(l.number));
     const todays = Cal.lessonOn(s, t);
-    if (behind) out.push(catchUpHtml(behind, t));
+    /* Under the hero: any message, then Friday and catch-up as two quiet chips side by side */
+    const chips = [fridayChip(s, t), behind ? catchUpChip(behind) : ""].filter(Boolean);
+    const below = notes.join("") + (chips.length ? `<div class="hero-chips enter">${chips.join("")}</div>` : "");
 
-    if (t < first) {
-      out.push(beforeStartHtml(s, t));
-    } else if (todays) {
-      out.push(heroHtml(todays, s, t));
-      out.push(recapTeaserHtml(todays, s));
-    } else if (!behind && LESSONS.every((l) => isDone(l.number))) {
-      out.push(finishedHtml());
-    } else if (!behind && t > s.finishDate) {
-      out.push(finishedHtml());
-    } else {
-      out.push(noLessonHtml(s, t));
-    }
-    main.innerHTML = out.join("");
+    let html;
+    if (t < first) html = beforeStartHtml(s, t, below);
+    else if (todays) html = heroHtml(todays, s, t) + below + todayCardsHtml(todays) + recapTeaserHtml(todays, s);
+    else if (!behind && (LESSONS.every((l) => isDone(l.number)) || t > s.finishDate)) html = finishedHtml() + below;
+    else html = noLessonHtml(s, t, below);
+    main.innerHTML = html;
   }
 
+  /* Today's lesson. Front: the label, the title, the one idea, then the one orange button ("Start lesson timer"),
+     with "I did it" and "Can't today" side by side under it, and the "starts in" line.
+     While the timer runs, its digits are the Huge thing, the title steps down, and "I did it" becomes the orange button. */
   function heroHtml(n, s, t) {
-    const l = lessonData(n), date = Cal.dateOf(s, n), done = isDone(n), timing = S.timer && S.timer.lesson === n;
-    const actions = done
+    const l = lessonData(n), date = Cal.dateOf(s, n), done = isDone(n), timing = !!(S.timer && S.timer.lesson === n);
+    const act = done
       ? `<p class="done-mark pop">${ICON.tick} Done${S.done[n].on === t ? " today" : ""}</p>
-         <a class="btn btn--ghost" href="#/lesson/${n}">Open the full lesson</a>
-         <button type="button" class="btn btn--ghost" data-action="undone" data-n="${n}">Not done after all</button>`
-      : `${timing ? "" : `<button type="button" class="btn btn--primary" data-action="timer-start" data-n="${n}">${ICON.timer} Start lesson timer</button>`}
-         <button type="button" class="btn ${timing ? "btn--primary" : ""}" data-action="done" data-n="${n}">${ICON.tick} I did it</button>
-         ${date === t ? `<button type="button" class="btn btn--ghost" data-action="cant" data-n="${n}">Can't today, move it</button>` : ""}
-         <button type="button" class="btn btn--ghost" data-action="copy" data-n="${n}">${ICON.copy} Copy message for my tutor</button>
-         <a class="btn btn--ghost" href="#/lesson/${n}">Open the full lesson</a>`;
-    return `<article class="card card--hero has-visual enter" style="${weekVar(n)}" aria-labelledby="hero-title">
-      <div class="hero-head">
-      ${overlineHtml(n, s, t)}
+         <div class="actions"><button type="button" class="btn" data-action="undone" data-n="${n}">Not done after all</button></div>`
+      : `<div id="timer-box">${timerHtml(n)}</div>
+         ${timing ? "" : `<button type="button" class="btn btn--primary btn--wide hero-go" data-action="timer-start" data-n="${n}">${ICON.timer} Start lesson timer</button>`}
+         <div class="hero-pair">
+           <button type="button" class="btn ${timing ? "btn--primary" : ""}" data-action="done" data-n="${n}">${ICON.tick} I did it</button>
+           ${date === t ? `<button type="button" class="btn" data-action="cant" data-n="${n}">Can't today</button>` : ""}
+         </div>`;
+    return heroShell(n, `${overlineHtml(n, s, t)}
       <h1 class="big-title" id="hero-title">${esc(l.title)}</h1>
       <p class="idea">${linked(l.ideaInOneSentence, n)}</p>
+      <div class="hero-act">${act}</div>
+      <p class="countdown" id="countdown" data-n="${n}" data-date="${date}">${countdownHtml(n, date, t)}</p>`, { timing });
+  }
+
+  /* Under Today's hero: what you'll make, the proof and the keys in quiet cards, then the two quieter buttons */
+  function todayCardsHtml(n) {
+    const l = lessonData(n);
+    return `<div class="two-up">
+        <section class="card enter" aria-labelledby="make-title"><h2 class="section-title" id="make-title">What you'll make</h2><p>${linked(l.youMake, n)}</p></section>
+        <section class="card enter" aria-labelledby="proof-title"><h2 class="section-title" id="proof-title">Proof to send</h2><p>${linked(l.proofToSend, n)}</p></section>
       </div>
-      <div class="hero-visual">${visualHtml(n)}</div>
-      <div class="hero-body">
-      <dl class="facts facts--two">
-        <div><dt>What you'll make</dt><dd>${linked(l.youMake, n)}</dd></div>
-        <div><dt>Proof to send</dt><dd>${linked(l.proofToSend, n)}</dd></div>
-      </dl>
-      <p class="countdown" id="countdown" data-n="${n}" data-date="${date}">${countdownHtml(n, date, t)}</p>
-      <div id="timer-box">${timerHtml(n)}</div>
-      <div class="actions actions--hero">${actions}</div>
-      </div>
-    </article>`;
+      ${keysCardHtml(n)}
+      <div class="actions enter">
+        ${isDone(n) ? "" : `<button type="button" class="btn" data-action="copy" data-n="${n}">${ICON.copy} Copy message for my tutor</button>`}
+        <a class="btn" href="#/lesson/${n}">Open the full lesson</a>
+      </div>`;
   }
 
   function recapTeaserHtml(n, s) {
@@ -659,15 +684,15 @@
     return `<div class="two-up">${recap}${teaser}</div>`;
   }
 
-  /* Slim one-line strips on Today (Friday, catch-up), so the lesson card stays in view on a phone.
-     Pweza says the words in his bubble; the strip holds the one thing to do. Tap the words for more. */
-  function stripHtml(words, href, button) {
-    return `<div class="strip enter" role="status"><a class="strip-text" href="${href}"><span class="strip-words">${words}</span>${ICON.right}</a>${button}</div>`;
+  /* A quiet chip under the hero (Friday, catch-up): a small label and a few words, and the whole chip is one tap.
+     Pweza says the longer words in his bubble. */
+  function chipHtml(label, words, action, n) {
+    return `<button type="button" class="qchip" data-action="${action}"${n != null ? ` data-n="${n}"` : ""}>
+      <span class="qchip-label">${label}</span><span class="qchip-text">${words}</span></button>`;
   }
 
-  function catchUpHtml(b, t) {
-    return stripHtml(`<strong>${esc(labelOf(b.number))}</strong> isn't ticked yet`, `#/lesson/${b.number}`,
-      `<button type="button" class="btn btn--small" data-action="catchup-choose" data-n="${b.number}">Catch up</button>`);
+  function catchUpChip(b) {
+    return chipHtml("Catch up", `${esc(labelOf(b.number))} isn't ticked`, "catchup-choose", b.number);
   }
 
   /* "Catch up": the same three choices the old notice had, in a small window. */
@@ -685,22 +710,17 @@
     else if (r.value === "open") go("#/lesson/" + n);
   }
 
-  function beforeStartHtml(s, t) {
+  /* Before lesson 1: the same hero, with 00 at the back and the set-up picture */
+  function beforeStartHtml(s, t, below) {
     const first = s.lessons[0].date, l1 = lessonData(1);
-    return `<article class="card card--hero has-visual enter" style="--wk: var(--accent); --wk-ink: var(--on-accent)" aria-labelledby="hero-title">
-        <div class="hero-head">
-        ${overlineHtml(0, s, t)}
+    return heroShell(0, `${overlineHtml(0, s, t)}
         <h1 class="big-title" id="hero-title">${esc(DAY0.title)}</h1>
         <p class="idea">${linked(DAY0.ideaInOneSentence, 0)}</p>
-        </div>
-        <div class="hero-visual">${visualHtml(0)}</div>
-        <div class="hero-body">
-        ${checklistHtml()}
-        <p class="countdown">Your first lesson: <strong>${esc(Cal.formatLong(first))}</strong> at <strong>${esc(S.settings.lessonTime)}</strong> · ${inDays(t, first)}</p>
-        <div class="actions"><a class="btn btn--ghost" href="#/lesson/0">Open the full step</a></div>
-        </div>
-      </article>
-      <section class="card enter" style="${weekVar(1)}" aria-labelledby="next-title">
+        <div class="hero-act"><a class="btn btn--primary btn--wide hero-go" href="#/lesson/0">Open the full step</a></div>
+        <p class="countdown">Your first lesson: <strong>${esc(Cal.formatLong(first))}</strong> at <strong>${esc(S.settings.lessonTime)}</strong> · ${inDays(t, first)}</p>`) +
+      below + `
+      <section class="card enter" aria-labelledby="chk-title"><h2 class="section-title" id="chk-title">Checklist</h2>${checklistHtml()}</section>
+      <section class="card enter" aria-labelledby="next-title">
         <p class="overline">Lesson 1 · ${esc(Cal.formatNoYear(first))}</p>
         <h2 class="card-title" id="next-title">${esc(l1.title)}</h2>
         <p class="muted">${linked(l1.ideaInOneSentence, 1)}</p>
@@ -708,24 +728,23 @@
       </section>`;
   }
 
-  function noLessonHtml(s, t) {
+  /* No lesson today (a day off, or the lesson moved): the hero's front layer only */
+  function noLessonHtml(s, t, below) {
     const info = Cal.dayInfo(S.plan, s, t);
     const next = Cal.nextLessonFrom(s, t);
     const past = s.lessons.filter((l) => l.date < t).pop();
     const title = info.dayOff ? `Day off: ${info.dayOff}` : info.missed ? "No lesson today: it moved" : "No lesson today";
-    const practice = past
-      ? `<p class="muted">${esc(C.course.dayOff.practice)}</p><p class="small muted">Last lesson, ${esc(labelOf(past.number))}: ${linked(lessonData(past.number).youMake, past.number)}</p>`
-      : "";
-    let html = `<article class="card card--hero enter" style="--wk: var(--day-off)" aria-labelledby="hero-title">
-        <p class="overline">${esc(Cal.formatLong(t))}</p>
+    let html = heroShell(null, `<p class="overline">${esc(Cal.formatLong(t))}</p>
         <h1 class="big-title" id="hero-title">${esc(title)}</h1>
-        <p class="idea">${esc(C.course.dayOff.text)}</p>
-        ${practice ? `<h2 class="section-title">A small practice idea</h2>${practice}` : ""}
-      </article>`;
+        <p class="idea">${esc(C.course.dayOff.text)}</p>`) + below;
+    if (past) {
+      html += `<section class="card enter" aria-labelledby="practice-title"><h2 class="section-title" id="practice-title">A small practice idea</h2>
+        <p class="muted">${esc(C.course.dayOff.practice)}</p><p class="small muted">Last lesson, ${esc(labelOf(past.number))}: ${linked(lessonData(past.number).youMake, past.number)}</p></section>`;
+    }
     if (next) {
       const nl = lessonData(next.number);
-      html += `<section class="card enter" style="${weekVar(next.number)}" aria-labelledby="next-title">
-        <p class="overline"><span class="tag tag--week">Week ${nl.week}</span><span>Day ${nl.day}</span><span>Next lesson</span></p>
+      html += `<section class="card enter" aria-labelledby="next-title">
+        <p class="overline">${dotted([`Week ${nl.week}`, `Day ${nl.day}`, "Next lesson"])}</p>
         <h2 class="card-title" id="next-title">${esc(nl.title)}</h2>
         <p class="muted">${linked(nl.ideaInOneSentence, next.number)}</p>
         <p class="countdown" id="countdown" data-n="${next.number}" data-date="${next.date}">${countdownHtml(next.number, next.date, t)}</p>
@@ -736,12 +755,10 @@
   }
 
   function finishedHtml() {
-    return `<article class="card card--hero enter" aria-labelledby="hero-title">
-      <p class="overline">The end of the course</p>
+    return heroShell(null, `<p class="overline">The end of the course</p>
       <h1 class="big-title" id="hero-title">All ${COUNT} lessons done</h1>
       <p class="idea">Your certificate opens once all nine points of the final project standard are ticked.</p>
-      <p class="muted">${esc(lessonData(COUNT).next)}</p>
-    </article>`;
+      <p class="muted">${esc(lessonData(COUNT).next)}</p>`);
   }
 
   /* ---------- Calendar ---------- */
@@ -761,8 +778,9 @@
     const lo = first.slice(0, 7), hi = finish.slice(0, 7);
     calMonth = clampMonth(calMonth || t.slice(0, 7), lo, hi);
     const [y, m] = calMonth.split("-").map(Number);
+    /* The month is the Huge line, so in the month view "Calendar" is a small label; the list view has no month */
     const head = `<div class="screen-head enter">
-        <h1 class="screen-title">Calendar</h1>
+        <h1 class="screen-title${listView ? "" : " screen-title--label"}">Calendar</h1>
         <p class="screen-lead">${COUNT} lessons, from ${esc(Cal.formatNoYear(first))} to ${esc(Cal.formatLong(finish))}.</p>
       </div>`;
     const seg = `<nav class="seg" aria-label="Calendar view">
@@ -774,9 +792,9 @@
       return;
     }
     main.innerHTML = head + `<div class="cal-bar enter">
+        <h2 class="month-title" aria-live="polite">${Cal.MONTHS[m - 1]} ${y}</h2>
         <div class="month-nav">
           <button type="button" class="icon-btn" data-action="month" data-by="-1" aria-label="Previous month" ${calMonth <= lo ? "disabled" : ""}>${ICON.left}</button>
-          <h2 class="month-title" aria-live="polite">${Cal.MONTHS[m - 1]} ${y}</h2>
           <button type="button" class="icon-btn" data-action="month" data-by="1" aria-label="Next month" ${calMonth >= hi ? "disabled" : ""}>${ICON.right}</button>
         </div>${seg}</div>` + monthGridHtml(calMonth, s, t) + legendHtml();
   }
@@ -831,7 +849,7 @@
         <span class="state">${done ? `<span class="tick-colour" aria-label="Done">${ICON.tick}</span>` : proj ? `<span class="star-colour" aria-hidden="true">${ICON.star}</span>` : ""}</span>
       </a></li>`;
     };
-    const day0 = `<section class="week-block enter" style="--wk: var(--accent); --wk-ink: var(--on-accent)">
+    const day0 = `<section class="week-block enter" style="${weekVar(0)}">
         <div class="week-head"><span class="tag tag--week">Before you start</span><h2>${esc(DAY0.title)}</h2></div>
         <ul class="lesson-list"><li><a class="lesson-link" href="#/lesson/0">
           <span class="num">0</span><img class="list-thumb" src="${thumb(0)}" alt="" loading="lazy" width="192" height="108"><span class="t">${esc(DAY0.title)}<span class="when">${esc(DAY0.length)}</span></span>
@@ -855,7 +873,6 @@
       return;
     }
     const s = schedule(), t = todayKey(), l = lessonData(n);
-    const shortcuts = C.shortcuts.filter((x) => x.firstLesson === n);
     const nextDate = n < COUNT ? Cal.dateOf(s, n + 1) : null;
     const facts = [
       ["The one idea", linked(l.oneIdea, n)],
@@ -865,31 +882,24 @@
       ["Next", linked(l.next, n) + (nextDate ? ` <span class="muted">(${esc(Cal.formatNoYear(nextDate))})</span>` : "")]
     ];
     const guide = (l.stepByStepGuide || "").trim();
-    const doneBlock = n === 0 ? "" : isDone(n)
+    /* The same hero as Today: the number at the back, the picture floating, the title in front, and "I did it" as the one orange button */
+    const act = n === 0 ? "" : isDone(n)
       ? `<p class="done-mark">${ICON.tick} Done on ${esc(Cal.formatLong(S.done[n].on))}</p>
-         <button type="button" class="btn btn--ghost" data-action="undone" data-n="${n}">Not done after all</button>`
-      : `<button type="button" class="btn btn--primary" data-action="done" data-n="${n}">${ICON.tick} I did it</button>`;
+         <div class="actions"><button type="button" class="btn" data-action="undone" data-n="${n}">Not done after all</button></div>`
+      : `<button type="button" class="btn btn--primary btn--wide hero-go" data-action="done" data-n="${n}">${ICON.tick} I did it</button>`;
     main.innerHTML = `
       <div class="sheet-nav sheet-nav--top enter"><a class="btn btn--ghost btn--small" href="#/calendar/list">${ICON.left} All lessons</a></div>
-      <article class="card card--hero has-visual enter" style="${weekVar(n)}" aria-labelledby="sheet-title">
-        <div class="hero-head">
-        ${overlineHtml(n, s, t)}
+      ${heroShell(n, `${overlineHtml(n, s, t)}
         <h1 class="big-title" id="sheet-title">${esc(l.title)}</h1>
         <p class="idea">${linked(l.ideaInOneSentence, n)}</p>
-        </div>
-        <div class="hero-visual">${visualHtml(n)}</div>
-        <div class="hero-body">
-        <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-        ${n === 0 ? `<h2 class="section-title">Checklist</h2>${checklistHtml()}` : ""}
-        ${shortcuts.length ? `<h2 class="section-title">Keys and buttons in this lesson</h2>
-          <ul class="shortcut-list">${shortcuts.map((sc) => `<li>${chipsHtml(sc)}<span>${esc(sc.does)}${sc.where ? ` <span class="muted small">${esc(sc.where)}</span>` : ""}</span></li>`).join("")}</ul>` : ""}
-        <h2 class="section-title">Step-by-step guide</h2>
-        ${guide ? guide.split(/\n+/).map((p) => `<p>${linked(p, n)}</p>`).join("") : '<p class="guide-empty">Filled in after the lesson.</p>'}
-        <h2 class="section-title">My work</h2>
-        <div id="sheet-work"><p class="muted">Loading…</p></div>
-        ${doneBlock ? `<div class="actions">${doneBlock}</div>` : ""}
-        </div>
-      </article>
+        ${act ? `<div class="hero-act">${act}</div>` : ""}`, { id: "sheet-title" })}
+      <section class="card enter" aria-label="About this lesson"><dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></section>
+      ${n === 0 ? `<section class="card enter" aria-labelledby="chk-title"><h2 class="section-title" id="chk-title">Checklist</h2>${checklistHtml()}</section>` : ""}
+      ${keysCardHtml(n)}
+      <section class="card enter" aria-labelledby="guide-title"><h2 class="section-title" id="guide-title">Step-by-step guide</h2>
+        ${guide ? guide.split(/\n+/).map((p) => `<p>${linked(p, n)}</p>`).join("") : '<p class="guide-empty">Filled in after the lesson.</p>'}</section>
+      <section class="card enter" aria-labelledby="work-title"><h2 class="section-title" id="work-title">My work</h2>
+        <div id="sheet-work"><p class="muted">Loading…</p></div></section>
       <nav class="sheet-nav enter" aria-label="Other lessons">
         ${n > 0 ? `<a class="btn btn--ghost" href="#/lesson/${n - 1}">${ICON.left} ${esc(labelOf(n - 1))}</a>` : "<span></span>"}
         ${n < COUNT ? `<a class="btn btn--ghost" href="#/lesson/${n + 1}">${esc(labelOf(n + 1))} ${ICON.right}</a>` : ""}
@@ -941,7 +951,7 @@
         <span class="map-label ${p.x < 50 ? "" : "is-left"}" style="top: ${p.y}px; ${where}" aria-hidden="true"><strong>Day ${l.day}</strong> · ${esc(l.title)}</span>`;
     }).join("");
     return `<section class="map-week enter" style="--wk: var(--week-${w.week})" aria-labelledby="map-wk-${w.week}">
-      <div class="map-week-head"><span class="tag tag--week">Week ${w.week}</span><h2 id="map-wk-${w.week}">${esc(w.theme)}</h2></div>
+      <div class="map-week-head"><span class="back-num map-num" aria-hidden="true">${pad2(w.week)}</span><span class="tag tag--week">Week ${w.week}</span><h2 id="map-wk-${w.week}">${esc(w.theme)}</h2></div>
       <div class="map-path" style="height: ${H}px">
         <svg class="map-line" viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}" vector-effect="non-scaling-stroke"/></svg>
         ${nodes}
@@ -1143,8 +1153,9 @@
     const opts = [0].concat(LESSONS.map((l) => l.number));
     return opts.map((n) => `<option value="${n}" ${n === selected ? "selected" : ""}>${esc(labelOf(n))}: ${esc(lessonData(n).title)}</option>`).join("");
   }
-  function screenHead(title, lead, over) {
-    return `<div class="screen-head enter">${over ? `<p class="overline">${esc(over)}</p>` : ""}<h1 class="screen-title">${esc(title)}</h1>${lead ? `<p class="screen-lead">${lead}</p>` : ""}</div>`;
+  /* A screen's title. It is the screen's Huge line, unless `huge` holds the Huge thing (Me's percent): then the title is a small label. */
+  function screenHead(title, lead, over, huge) {
+    return `<div class="screen-head enter">${over ? `<p class="overline">${esc(over)}</p>` : ""}<h1 class="screen-title${huge ? " screen-title--label" : ""}">${esc(title)}</h1>${huge || ""}${lead ? `<p class="screen-lead">${lead}</p>` : ""}</div>`;
   }
 
   /* ---------- Progress ---------- */
@@ -1183,13 +1194,10 @@
     </section>`;
   }
 
-  function fridayHtml(s, t) {
+  /* Friday's chip on Today: one tap saves the backup (the week's report card is in Progress) */
+  function fridayChip(s, t) {
     if (Cal.weekday(t) !== 5 || S.lastBackup === t) return "";
-    const [mon, sun] = weekRange(t);
-    const list = s.lessons.filter((l) => l.date >= mon && l.date <= sun);
-    const doneN = list.filter((l) => isDone(l.number)).length;
-    return stripHtml(`<strong>Friday</strong>${list.length ? ` · ${doneN} of ${list.length} ticked this week` : " · your week report"}`, "#/progress",
-      `<button type="button" class="btn btn--small" data-action="backup">Save a backup</button>`);
+    return chipHtml("Friday", "Save a backup", "backup");
   }
 
   function renderProgress() {
@@ -1203,7 +1211,7 @@
         <span class="wk-num">${d} of ${total}</span></li>`;
     }).join("");
     const projects = WEEKS.filter((w) => w.week < 6).map((w) => ({ n: w.lastLesson, name: `Week ${w.week} project`, short: `W${w.week}`, wk: `var(--week-${w.week})` }))
-      .concat([{ n: COUNT, name: "Final project", short: "Final", wk: "var(--accent); --wk-ink: var(--on-accent)" }]);
+      .concat([{ n: COUNT, name: "Final project", short: "Final", wk: "var(--label-primary)" }]);
     const badges = projects.map((b) => `<li class="badge ${isDone(b.n) ? "is-earned" : ""}" data-badge="${b.n}" style="--wk: ${b.wk}">
         <span class="badge-disc" aria-hidden="true">${isDone(b.n) ? ICON.star : ""}<b>${esc(b.short)}</b></span>
         <span class="badge-name">${esc(b.name)}</span><span class="small muted">${isDone(b.n) ? "Earned" : "Not yet"}</span></li>`).join("");
@@ -1368,7 +1376,7 @@
     const byLesson = [];
     pics.forEach((p) => { let g = byLesson.find((x) => x.n === p.lesson); if (!g) { g = { n: p.lesson, list: [] }; byLesson.push(g); } g.list.push(p); });
     body.innerHTML = byLesson.map((g) => `<section class="work-lesson enter" style="${weekVar(g.n)}" aria-labelledby="wl-${g.n}">
-      <h2 class="work-head" id="wl-${g.n}"><span class="tag tag--week">${esc(labelOf(g.n))}</span> <a href="#/lesson/${g.n}">${esc(lessonData(g.n).title)}</a></h2>
+      <h2 class="work-head" id="wl-${g.n}"><span class="tag">${esc(labelOf(g.n))}</span> <a href="#/lesson/${g.n}">${esc(lessonData(g.n).title)}</a></h2>
       <ul class="work-grid">${g.list.map((p) => `<li><button type="button" class="work-thumb" data-action="view-pic" data-id="${esc(p.id)}">
         <img src="${urlFor(p.blob)}" alt="Your picture for ${esc(labelOf(g.n))}, added on ${esc(Cal.formatLong(p.addedOn))}"></button></li>`).join("")}</ul></section>`).join("");
   }
@@ -1457,7 +1465,9 @@
   function renderCertificate() {
     const s = schedule(), st = certStatus();
     const item = (ok, text, link) => `<li class="${ok ? "is-done" : ""}"><span class="report-mark" aria-hidden="true">${ok ? ICON.tick : ""}</span><span>${text}</span>${link || ""}</li>`;
-    main.innerHTML = screenHead("Certificate", st.ready ? "Everything is done. Well done." : "It unlocks when these three things are done.", "") + `
+    /* The name on the certificate is this screen's Huge line, so the title is a small label */
+    main.innerHTML = `<div class="screen-head enter"><h1 class="screen-title screen-title--label">Certificate</h1>
+      <p class="screen-lead">${st.ready ? "Everything is done. Well done." : "It unlocks when these three things are done."}</p></div>` + `
       <section class="card enter no-print" aria-labelledby="need-title"><h2 class="card-title" id="need-title">${st.ready ? "All done" : "Still to do"}</h2>
         <ul class="report-list">
           ${item(!st.lessonsLeft, st.lessonsLeft ? `${st.lessonsLeft} of ${COUNT} lessons still to tick` : `All ${COUNT} lessons ticked`, st.lessonsLeft ? ' <a href="#/calendar/list" class="small">See the lessons</a>' : "")}
@@ -1524,7 +1534,7 @@
       <section class="card enter" aria-labelledby="set-backup"><h2 class="card-title" id="set-backup">Backup</h2>
         <p class="muted">One file, ${esc(Files.backupFileName(t))}, with your progress, notes, dates and pictures. Keep it somewhere safe, such as your email or a cloud drive. A good habit: save one every Friday.</p>
         ${S.lastBackup ? `<p class="small muted">Last backup: ${esc(Cal.formatLong(S.lastBackup))}.</p>` : ""}
-        <div class="actions"><button type="button" class="btn btn--primary" data-action="backup">Save a backup</button>
+        <div class="actions"><button type="button" class="btn" data-action="backup">Save a backup</button>
           <button type="button" class="btn btn--ghost" data-action="restore">Restore from a backup</button></div></section>
 
       <section class="card enter" aria-labelledby="set-ics"><h2 class="card-title" id="set-ics">Phone calendar</h2>
@@ -1534,7 +1544,7 @@
 
       <section class="card enter" aria-labelledby="set-home"><h2 class="card-title" id="set-home">Put it on your home screen</h2>
         ${window.matchMedia("(display-mode: standalone)").matches ? '<p class="muted">You are using the app from your home screen. It works without internet.</p>' : `
-        ${installPrompt ? '<div class="actions"><button type="button" class="btn btn--primary" data-action="install">Add to home screen</button></div>' : ""}
+        ${installPrompt ? '<div class="actions"><button type="button" class="btn" data-action="install">Add to home screen</button></div>' : ""}
         <p><strong>iPhone or iPad:</strong> open the app in Safari, tap Share, then “Add to Home Screen”.</p>
         <p><strong>Android:</strong> in Chrome, open the menu (⋮) and choose “Install app” or “Add to Home screen”.</p>
         <p class="muted">Once it is on your home screen, it opens like an app and works without internet.</p>`}</section>
@@ -1678,7 +1688,9 @@
     const st = certStatus();
     const icon = (tab) => { const svg = tabs.querySelector(`[data-tab="${tab}"] .tab-icon`); return svg ? svg.outerHTML.replace(' class="tab-icon"', "") : ""; };
     const row = (tab, title, text) => `<li><a class="more-link" href="#/${tab}">${icon(tab)}<span class="more-title">${title}</span><span class="small muted">${text}</span></a></li>`;
-    main.innerHTML = screenHead("Me", "", "") + `<ul class="more-list enter">
+    /* Me's Huge line is how much of the course is done */
+    const pct = Math.round((doneCount() / COUNT) * 100);
+    main.innerHTML = screenHead("Me", `of the course done · ${doneCount()} of ${COUNT} lessons`, "", `<p class="huge">${pct}%</p>`) + `<ul class="more-list enter">
       ${row("progress", "Progress", `${doneCount()} of ${COUNT} lessons done, badges, this week`)}
       ${row("work", "My work", "Your screenshots and renders")}
       ${row("certificate", "Certificate", st.ready ? "Ready to print" : "What is still missing")}
@@ -1756,6 +1768,57 @@
     SC.go(page);
   }
 
+  /* The hero's layers move at different speeds as you scroll: the number at the back at half speed,
+     the picture at three-quarter speed, the words at full speed. Only transforms move (and the picture fades a little
+     as it slides under the words, so its key chips never sit behind the label). With Reduce motion nothing moves. */
+  function heroDepth() {
+    const num = main.querySelector(".hero-num"), pic = main.querySelector(".hero-pic");
+    if (!num && !pic) return;
+    const y = reduceMotion.matches ? 0 : Math.max(0, Math.min(window.scrollY, 1600));
+    if (num) num.style.transform = y ? `translate3d(0, ${(y * 0.5).toFixed(1)}px, 0)` : "";
+    if (pic) {
+      pic.style.transform = y ? `translate3d(0, ${(y * 0.25).toFixed(1)}px, 0)` : "";
+      pic.style.opacity = y ? Math.max(0.12, 1 - y / 320).toFixed(3) : "";
+    }
+  }
+  /* ---------- Glass ----------
+     The top bar, the tab bar, Pweza's bubble and Today's chips are frosted glass (see-through and blurred).
+     Blur is the costliest thing to draw, so at most 3 glass surfaces are on screen at once: the bars first,
+     then Pweza's bubble, then the chips (one blur for the pair). One that doesn't fit shows the same colour, solid;
+     over the black page it looks the same. During a big moment its dark backdrop takes the bubble's place.
+     No glass where the browser can't blur, or with Reduce motion or Reduce transparency. */
+  const GLASS_MAX = 3;
+  const reduceTransparency = window.matchMedia("(prefers-reduced-transparency: reduce)");
+  const canBlur = !!(window.CSS && CSS.supports && (CSS.supports("backdrop-filter", "blur(1px)") || CSS.supports("-webkit-backdrop-filter", "blur(1px)")));
+  const topbarEl = document.querySelector(".topbar");
+  function placeGlass() {
+    const allowed = canBlur && !reduceMotion.matches && !reduceTransparency.matches;
+    const vh = window.innerHeight;
+    const onScreen = (el) => { if (!el || !el.isConnected) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh; };
+    const dim = moment ? moment.dim : null;
+    const bubble = moment ? null : main.querySelector(".pz-row .pz-say"), chips = moment ? null : main.querySelector(".hero-chips");
+    const wanted = [dim, topbarEl, !tabs.hidden && !laptopMenu.matches ? tabs : null, bubble, chips];
+    const give = new Set();
+    wanted.forEach((el) => { if (allowed && el && give.size < GLASS_MAX && onScreen(el)) give.add(el); });
+    const all = new Set(wanted.concat([tabs], Array.from(document.querySelectorAll(".is-glass"))));
+    all.forEach((el) => { if (el) el.classList.toggle("is-glass", give.has(el)); });
+    /* Scrolling only changes the glass where Pweza's bubble or the chips can come and go */
+    glassMoves = allowed && !!(bubble || chips);
+    depthMoves = !!main.querySelector(".hero-num");
+  }
+  /* What scrolling has to update. On screens with no hero, bubble or chips (the Map, the Calendar...) it does nothing,
+     so it never takes time from the scroll itself. */
+  let scrollFrame = 0, glassDirty = true, glassMoves = false, depthMoves = false;
+  const onScrollFrame = () => {
+    scrollFrame = 0;
+    if (glassDirty || glassMoves) { glassDirty = false; placeGlass(); }
+    if (depthMoves) heroDepth();
+  };
+  window.addEventListener("scroll", () => { if (!scrollFrame && (glassMoves || depthMoves)) scrollFrame = requestAnimationFrame(onScrollFrame); }, { passive: true });
+  const glassSoon = () => { glassDirty = true; if (!scrollFrame) scrollFrame = requestAnimationFrame(onScrollFrame); };
+  [reduceMotion, reduceTransparency].forEach((mq) => { if (mq.addEventListener) mq.addEventListener("change", glassSoon); });
+  window.addEventListener("resize", glassSoon);
+
   /* Cards come in one after another, 40 ms apart, when you arrive on a screen. */
   let shownHash = null;
   function staggerCards() {
@@ -1796,6 +1859,8 @@
     }
     sceneFollow(page);
     staggerCards();
+    /* the glass is shared out on the next frame (a new screen's hero starts unshifted; scrolling moves its layers) */
+    glassSoon();
   }
 
   /* A calendar tile grows into the lesson sheet. Where the browser can't do that, the sheet simply fades in. */
@@ -1819,7 +1884,7 @@
     const vt = document.startViewTransition(() => {
       src.style.viewTransitionName = "";
       show();
-      card = main.querySelector(".card--hero");
+      card = main.querySelector(".hero");
       if (card) { card.style.viewTransitionName = "lesson-morph"; card.classList.add("is-morph"); }
     });
     const tidy = () => { if (card) card.style.viewTransitionName = ""; };
@@ -1862,7 +1927,7 @@
   function showUpdateBar() {
     if (document.getElementById("update-bar")) return;
     document.body.insertAdjacentHTML("beforeend",
-      '<div class="update-bar" id="update-bar" role="status"><button type="button" class="btn btn--primary" id="update-btn">New version ready, tap to update</button></div>');
+      '<div class="update-bar" id="update-bar" role="status"><button type="button" class="btn btn--inverse" id="update-btn">New version ready, tap to update</button></div>');
     document.getElementById("update-btn").addEventListener("click", () => location.reload());
   }
 
@@ -1880,16 +1945,116 @@
   applyTheme();
   route();
   ticker = setInterval(tick, 1000);
-  (function handOver() {
-    const pl = document.getElementById("preloader");
-    const intro = () => { if (window.CourseScene) window.CourseScene.intro(); };
-    if (!pl) { intro(); return; }
-    const first = document.documentElement.classList.contains("pl-first");
-    setTimeout(() => {
-      pl.classList.add("is-gone");
-      intro();
-      try { localStorage.setItem("zedlabBlenderCourse.intro", "1"); } catch (e) { /* plays again next time */ }
-      setTimeout(() => pl.remove(), 320);
-    }, first ? Math.max(0, 1500 - performance.now()) : 0);
+  /* ---------- The opening, every time ----------
+     The opening plays every time the app opens and stays until Pweza's wave has finished (about 1.8 s),
+     even when the app is ready sooner, then fades out over 0.5 s. The moment the app goes to the
+     background, the same screen goes up again as a cover (Pweza, the words, the line empty), so the
+     phone's app switcher shows Pweza and coming back never flashes the old screen first. Coming back
+     plays it again for the same time (he is already standing there, so without the drop).
+     A tap anywhere (or any key) skips it. It never touches the lesson timer: the timer follows the
+     real clock. With "reduce motion" there is no drop and no wave: Pweza and the words show still
+     for 1 s, then fade. */
+  (function opening() {
+    const firstPl = document.getElementById("preloader");
+    const template = firstPl ? firstPl.cloneNode(true) : null;
+    const FADE_MS = 500;
+    const showMs = () => (reduceMotion.matches ? 1000 : 1800);
+    let pl = firstPl, state = firstPl ? "opening" : "idle", run = 0, safety = 0, introDone = false;
+    const playing = () => state === "opening" || state === "back";
+    const sceneIntro = () => { if (!introDone) { introDone = true; if (window.CourseScene) window.CourseScene.intro(); } };
+    const svgOf = (el) => { const s = el.querySelector("svg"); return s && s.pauseAnimations ? s : null; };
+
+    /* The line is full, or a tap: the cover fades away. After a tap it keeps catching that tap
+       until the finger lifts, so the tap never presses anything underneath. */
+    function done(tapped) {
+      if (!pl || !playing()) return;
+      const el = pl;
+      pl = null; state = "idle"; run++; clearTimeout(safety);
+      el.classList.add("is-gone");
+      if (tapped) el.classList.add("is-tapped");
+      let wait = tapped ? 2 : 1;
+      const drop = () => { if (--wait <= 0) el.remove(); };
+      setTimeout(drop, FADE_MS + 40);
+      if (tapped) {
+        const up = () => { document.removeEventListener("pointerup", up, true); document.removeEventListener("pointercancel", up, true); setTimeout(drop, 80); };
+        document.addEventListener("pointerup", up, true);
+        document.addEventListener("pointercancel", up, true);
+        setTimeout(() => el.remove(), 1500);
+      }
+      sceneIntro();
+    }
+    /* It ends when the orange line is full (with "reduce motion" the line runs unseen). A clock keeps
+       it honest: never shorter, and at most a moment longer, even if the page's frames come late or
+       its clocks jump when it comes back from the background. */
+    function whenFull(ms) {
+      const id = ++run, t0 = performance.now(), line = pl.querySelector(".pl-line i");
+      const a = line && line.getAnimations ? line.getAnimations()[0] : null;
+      let wait = ms;
+      if (a) {
+        const dur = Number(a.effect.getTiming().duration) || ms;
+        /* a line not started yet starts with the next frame */
+        wait = a.startTime != null && document.timeline ? Math.max(0, a.startTime + dur - document.timeline.currentTime) : dur;
+      }
+      /* and never before his wave has finished (the drawing keeps its own clock) */
+      const svg = svgOf(pl), wave = pl.querySelector(".pl-arm-anim animate");
+      if (svg && wave && !reduceMotion.matches) {
+        const end = parseFloat(wave.getAttribute("begin")) + parseFloat(wave.getAttribute("dur"));
+        if (end > 0) wait = Math.max(wait, (end - svg.getCurrentTime()) * 1000 + 40);
+      }
+      const go = () => {
+        if (id !== run) return;
+        const left = wait - (performance.now() - t0);
+        if (left > 16) { clearTimeout(safety); safety = setTimeout(go, left); return; }
+        done(false);
+      };
+      if (a && a.finished) a.finished.then(go, () => { /* cut short by the app going to the background */ });
+      clearTimeout(safety);
+      safety = setTimeout(go, wait + 250);
+    }
+    /* Going to the background: the cover goes up at once, still, with the line empty */
+    function cover() {
+      if (!template) return;
+      run++; clearTimeout(safety);
+      document.querySelectorAll(".pl.is-gone").forEach((el) => el.remove());
+      if (!pl) pl = template.cloneNode(true);
+      pl.classList.add("is-rest");
+      pl.classList.remove("is-back");
+      /* over an open dialog too: a dialog sits above everything else on the page */
+      const host = document.querySelector("dialog[open]") || document.body;
+      if (pl.parentNode !== host) host.insertBefore(pl, host.firstChild);
+      const svg = svgOf(pl);
+      if (svg) { svg.pauseAnimations(); svg.setCurrentTime(0); }
+      state = "covered";
+    }
+    /* Coming back: the short version. It starts on the first frame back, once the page's clocks
+       have caught up from being away (until then the still cover shows, which looks the same). */
+    function back() {
+      if (state !== "covered" || !pl) return;
+      state = "back";
+      const el = pl;
+      let started = false;
+      const start = () => {
+        if (started || pl !== el || state !== "back") return;
+        started = true;
+        el.classList.remove("is-rest");
+        el.classList.add("is-back");
+        const svg = svgOf(el);
+        if (svg) { svg.setCurrentTime(0); svg.unpauseAnimations(); }
+        whenFull(showMs());
+      };
+      requestAnimationFrame(start);
+      setTimeout(start, 150);
+    }
+
+    document.addEventListener("pointerdown", (e) => { if (playing() && e.target.closest && e.target.closest(".pl")) done(true); }, true);
+    document.addEventListener("keydown", () => { if (playing()) done(false); }, true);
+    /* on the window, so the cover goes up before anything else reacts */
+    window.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") cover(); else back(); }, true);
+    window.addEventListener("pagehide", cover, true);
+    window.addEventListener("pageshow", (e) => { if (e.persisted) back(); });
+
+    if (!firstPl) sceneIntro();
+    else if (document.visibilityState === "hidden") cover();
+    else whenFull(Math.max(0, showMs() - performance.now()));
   })();
 })();
